@@ -14,7 +14,7 @@ A mock Mailgun service for dev/testing. Accepts real Mailgun API calls, stores d
 | 6 | Templates | [templates.md](./templates.md) ✅ | Template CRUD, versioning, variable rendering |
 | 7 | Tags | [tags.md](./tags.md) ✅ | Store tags on messages, return alongside stats |
 | 8 | Mailing Lists | [mailing-lists.md](./mailing-lists.md) ✅ | List and member CRUD, bulk operations |
-| 9 | Routes (Receiving) | [routes.md](./routes.md) | Inbound route management, stored message retrieval |
+| 9 | Routes (Receiving) | [routes.md](./routes.md) ✅ | Inbound route management, stored message retrieval |
 
 ## Stub Areas (minimal — accept calls, return 200)
 
