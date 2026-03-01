@@ -11,7 +11,7 @@ A mock Mailgun service for dev/testing. Accepts real Mailgun API calls, stores d
 | 3 | Events & Logs | [events-and-logs.md](./events-and-logs.md) ✅ | Generate realistic events for sent messages, support event polling |
 | 4 | Webhooks | [webhooks.md](./webhooks.md) ✅ | Register webhooks, deliver event payloads, simulate/trigger events |
 | 5 | Suppressions | [suppressions.md](./suppressions.md) ✅ | Bounces, complaints, unsubscribes, allowlist — full CRUD |
-| 6 | Templates | [templates.md](./templates.md) | Template CRUD, versioning, variable rendering |
+| 6 | Templates | [templates.md](./templates.md) ✅ | Template CRUD, versioning, variable rendering |
 | 7 | Tags | [tags.md](./tags.md) | Store tags on messages, return alongside stats |
 | 8 | Mailing Lists | [mailing-lists.md](./mailing-lists.md) | List and member CRUD, bulk operations |
 | 9 | Routes (Receiving) | [routes.md](./routes.md) | Inbound route management, stored message retrieval |
