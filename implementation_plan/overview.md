@@ -22,7 +22,7 @@ A mock Mailgun service for dev/testing. Accepts real Mailgun API calls, stores d
 |---|------|------|-------------|
 | 10 | IPs & IP Pools | [ips-and-pools.md](./ips-and-pools.md) ✅ | Return static IP/pool data if app assigns pools to domains |
 | 11 | Credentials & Keys | [credentials-and-keys.md](./credentials-and-keys.md) ✅ | Basic API key gating, accept any key or configurable keys |
-| 12 | Subaccounts | [subaccounts.md](./subaccounts.md) | Basic CRUD if app uses multi-tenancy |
+| 12 | Subaccounts | [subaccounts.md](./subaccounts.md) ✅ | Basic CRUD if app uses multi-tenancy |
 | 13 | Metrics & Analytics | [metrics-and-analytics.md](./metrics-and-analytics.md) | Return stats derived from messages sent to the mock |
 
 ## UI / Control Panel
