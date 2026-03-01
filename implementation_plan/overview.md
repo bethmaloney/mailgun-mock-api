@@ -29,7 +29,7 @@ A mock Mailgun service for dev/testing. Accepts real Mailgun API calls, stores d
 
 | # | Area | Plan | Description |
 |---|------|------|-------------|
-| 14 | Web UI | [web-ui.md](./web-ui.md) | Inspect captured messages, view events, trigger webhook events, manage suppressions |
+| 14 | Web UI | [web-ui.md](./web-ui.md) ✅ | Inspect captured messages, view events, trigger webhook events, manage suppressions |
 
 ## Skipped Areas (not useful in mock/test context)
 
