@@ -92,8 +92,19 @@ Work items, notes, and things to explore in future iterations.
 
 - ~~**Domain-IP assignment endpoints:** `GET/POST /v3/domains/{domain}/ips` and `DELETE /v3/domains/{domain}/ips/{ip}` are documented in ips-and-pools.md. The domains.md plan already references these as cross-cutting.~~ ✅ Covered in ips-and-pools.md
 - **IP Pool version prefix discrepancy:** The OpenAPI spec documents pools at `/v3/ip_pools`, but Node.js and Python SDKs use `/v1/ip_pools`. The mock must accept both path prefixes. This is another instance of the v1/v3 version inconsistency pattern seen elsewhere (tags, analytics).
-- **IP Allowlist (`/v2/ip_whitelist`):** Account-level API for restricting which IPs can access the Mailgun API. CRUD with `ip_address` and `description` fields. This is a security/access-control feature — document in Credentials & Keys plan doc. (Also noted in Suppressions scratchpad.)
+- ~~**IP Allowlist (`/v2/ip_whitelist`):** Account-level API for restricting which IPs can access the Mailgun API. CRUD with `ip_address` and `description` fields. This is a security/access-control feature — document in Credentials & Keys plan doc. (Also noted in Suppressions scratchpad.)~~ ✅ Covered in credentials-and-keys.md
 - **v5 subaccount DIPP delegation:** Endpoints at `/v5/accounts/subaccounts/ip_pools/...` and `/v5/accounts/subaccounts/{id}/ip` for delegating pools and linking IPs to subaccounts. Complex async operations. Skip unless Subaccounts plan requires it.
 - **Alternate domain IP path:** The OpenAPI spec defines both `/v3/domains/{name}/ips/{ip}` and `/v3/domains/{name}/pool/{ip}` as alternate paths for the same delete operation. The mock should handle both.
 - **`o:ip-pool` message parameter:** Messages API accepts `o:ip-pool` to select a sending pool. Already documented in ips-and-pools.md integration section — the messages.md plan should reference this if it doesn't already.
 - **Asynchronous pool operations:** Pool delete, IP add/remove to pools, and domain-pool link changes all return `"started"` (not `"success"`) because real Mailgun processes them asynchronously. The mock should return `"started"` for API compatibility but process changes synchronously.
+
+## Discovered during Credentials & Keys research
+
+- **Key rotation grace period:** When rotating an API key, the old key continues to work for 48 hours before expiring. The mock could optionally simulate this, but for simplicity, key deletion should be immediate. Note for future if apps test key rotation flows.
+- **API key format:** Current keys use the prefix `key-` followed by ~48 hexadecimal characters. The mock should generate keys in this format for consistency.
+- **Public key prefix:** Public validation keys use `pubkey-` prefix. The mock should maintain this convention.
+- **`spec` path parameter inconsistency:** The PUT/DELETE credential endpoints use `{spec}` as the path parameter name, which represents the login local-part (e.g., `alice`), not the full email. But the DELETE response returns the full email in the `spec` field. The mock must handle this inconsistency.
+- **Ruby SDK missing list credentials:** The Ruby SDK has no `list_smtp_credentials` method — it only supports create/update/delete. This means some apps may not use the list endpoint at all.
+- **SMTP credentials no longer auto-created:** SMTP credentials are NOT auto-generated when creating a domain via the Domains API. They must be explicitly created. The mock's domain creation should NOT auto-create credentials.
+- **`X-Mailgun-On-Behalf-Of` header:** JS and Ruby SDKs support this header for subaccount context switching. The Subaccounts plan doc should define how this interacts with key validation.
+- **Request body encoding for credentials:** All credential/key create/update operations use `multipart/form-data`, NOT JSON. The mock must accept form-data for these endpoints (consistent with most Mailgun write endpoints).
