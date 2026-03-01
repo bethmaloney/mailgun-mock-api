@@ -8,7 +8,7 @@ A mock Mailgun service for dev/testing. Accepts real Mailgun API calls, stores d
 |---|------|------|-------------|
 | 1 | Email Sending (Messages) | [messages.md](./messages.md) ✅ | Accept messages via API/SMTP, validate payload shape, store for inspection |
 | 2 | Domains | [domains.md](./domains.md) ✅ | Domain CRUD, auto-verify or controllable verification status, DNS records |
-| 3 | Events & Logs | [events-and-logs.md](./events-and-logs.md) | Generate realistic events for sent messages, support event polling |
+| 3 | Events & Logs | [events-and-logs.md](./events-and-logs.md) ✅ | Generate realistic events for sent messages, support event polling |
 | 4 | Webhooks | [webhooks.md](./webhooks.md) | Register webhooks, deliver event payloads, simulate/trigger events |
 | 5 | Suppressions | [suppressions.md](./suppressions.md) | Bounces, complaints, unsubscribes, allowlist — full CRUD |
 | 6 | Templates | [templates.md](./templates.md) | Template CRUD, versioning, variable rendering |

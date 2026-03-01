@@ -6,7 +6,7 @@ Work items, notes, and things to explore in future iterations.
 
 - **SMTP sending:** The overview mentions "Accept messages via API/SMTP" but the Messages plan only covers HTTP API. SMTP ingestion (port 587/465) is a separate concern — consider whether the mock should support SMTP submission or just HTTP API. Add to a future iteration if needed.
 - **Template rendering:** Messages can reference templates by name (`template` field) and pass variables (`t:variables`). The Templates plan doc needs to cover how template rendering integrates with message sending (variable substitution, version resolution).
-- **Event generation from messages:** When a message is accepted, events (accepted, delivered, failed, etc.) need to be generated. The Events & Logs plan doc should define how message sending triggers event creation.
+- ~~**Event generation from messages:** When a message is accepted, events (accepted, delivered, failed, etc.) need to be generated. The Events & Logs plan doc should define how message sending triggers event creation.~~ ✅ Covered in events-and-logs.md
 - **Webhook delivery from messages:** Accepted/delivered events should trigger webhook delivery if webhooks are configured. The Webhooks plan doc should cover this integration.
 - **Suppression checking:** On send, Mailgun checks suppressions (bounces, complaints, unsubscribes) and may reject delivery. The Suppressions plan doc should cover how this integrates with sending.
 - **Storage key format:** Need to determine a good format for mock storage keys. Real Mailgun uses opaque keys that encode storage region info.
@@ -23,3 +23,12 @@ Work items, notes, and things to explore in future iterations.
 - **Dynamic IP pools enrollment:** `/v3/domains/{name}/dynamic_pools` and bulk enrollment at `/v3/domains/all/dynamic_pools/enroll`. Production-only concern, skip for mock.
 - **Domain state transitions:** Domains can be `active`, `unverified`, or `disabled`. The `disabled` state includes a nested object with `code`, `reason`, `permanently`, and `until` fields. The mock should support state transitions but doesn't need to enforce disable reasons.
 - **v3 vs v4 API versions:** Domain list/create/get/update are v4 endpoints, while delete, tracking, credentials, and DKIM management are v3 endpoints. The mock needs to handle both API versions correctly.
+
+## Discovered during Events & Logs research
+
+- **Logs API (v1/analytics/logs):** The newer POST-based analytics endpoint supports complex filtering, metric aggregation, and unique event deduplication. It's not used by major client libraries yet. Stubbing it is sufficient for the mock — documented in events-and-logs.md as a stub target.
+- **Webhook delivery from events:** Events should trigger webhook delivery if webhooks are configured for those event types. The Webhooks plan doc needs to define: when an event is generated → check for matching webhook subscriptions → POST event payload to webhook URL. This is the core integration point between events and webhooks.
+- **Suppression integration with events:** The events doc defines that suppressed recipients should generate `failed` events with appropriate `reason` values (`suppress-bounce`, `suppress-complaint`, `suppress-unsubscribe`). The Suppressions plan doc should document the lookup API that the message/event pipeline calls into.
+- **Mock event trigger endpoints:** The events plan proposes mock-specific endpoints (`/mock/events/{domain}/deliver/{message_id}`, etc.) for manually triggering event types. These are non-standard Mailgun endpoints — they should be documented in the Web UI plan as part of the mock's testing/debugging tools.
+- **Campaign tracking:** Events include a `campaigns` array field, but the Mailgun Campaigns API appears to be legacy/deprecated. The mock should accept campaign data on events but doesn't need a separate campaigns management area.
+- **Event log retention:** Real Mailgun retains events for 1-30 days depending on plan. The mock should keep all events by default with an optional configurable max. This should be a global mock configuration option.
