@@ -59,3 +59,12 @@ Work items, notes, and things to explore in future iterations.
 - **Version `engine` field defaults:** If `engine` is not provided when creating a template or version, it defaults to `"handlebars"`. The OpenAPI spec marks `engine` as required in the Version response schema.
 - **Template name used as pivot:** Pagination for templates uses the template `name` as the pivot (`p` parameter), while version pagination uses the version `tag`. This is consistent with the shared pagination model but the pivot field varies by resource type.
 - **`createdAt` casing in templates:** Templates and versions use `createdAt` (camelCase), consistent with allowlists but different from suppressions (`created_at` snake_case). The mock must use the correct casing per resource type.
+
+## Discovered during Tags research
+
+- **All tag endpoints are deprecated in the OpenAPI spec:** Every `/v3/{domain}/tag*` endpoint is marked `deprecated: true`. However, all three client SDKs (Node, Ruby, Python) still actively use these endpoints. The v1 Analytics Tags API is the intended replacement, but SDK adoption is incomplete. The mock must support both.
+- **OpenAPI spec vs SDK path discrepancy:** The OpenAPI spec defines tag CRUD at `/v3/{domain}/tag` (singular) with `tag` as a query parameter, but all SDKs use `/v3/{domain}/tags/{tag}` (plural) with tag in the path. The mock should support both forms.
+- **Tag per-message limit inconsistency:** Legacy documentation says 3 tags per message, but the Ruby SDK enforces `MAX_TAGS = 10`. The mock should accept up to 10 per message.
+- **Stats response shape is shared:** The `StatsResponse` schema (time-series with event buckets) is used by both tag stats (`/v3/{domain}/tags/{tag}/stats`) and domain stats (`/v3/{domain}/stats/total`). The Metrics & Analytics plan doc should reference this shared schema rather than re-defining it.
+- **`first-seen`/`last-seen` use hyphenated keys:** Tags in the legacy v3 API use hyphenated keys (`first-seen`, `last-seen`), which is yet another casing convention (distinct from `createdAt` camelCase in templates/allowlists and `created_at` snake_case in suppressions). The mock must track and apply the correct casing per resource type.
+- **v1 API uses POST for listing:** The new `/v1/analytics/tags` uses POST (not GET) for listing tags, with a JSON body containing pagination/filter parameters. This is unusual and should be noted in the Metrics & Analytics plan doc if that area covers the v1 analytics API more broadly.
