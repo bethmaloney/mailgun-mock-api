@@ -31,7 +31,7 @@ func New(db *gorm.DB) http.Handler {
 	}))
 
 	// Run domain model migrations.
-	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{})
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &domain.TrackingSetting{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -51,6 +51,14 @@ func New(db *gorm.DB) http.Handler {
 	r.Route("/v3/domains", func(r chi.Router) {
 		r.Use(appMiddleware.BasicAuth(h.Config()))
 		r.Delete("/{name}", dh.DeleteDomain)
+		r.Get("/{name}/tracking", dh.GetTracking)
+		r.Put("/{name}/tracking/open", dh.UpdateOpenTracking)
+		r.Put("/{name}/tracking/click", dh.UpdateClickTracking)
+		r.Put("/{name}/tracking/unsubscribe", dh.UpdateUnsubscribeTracking)
+		r.Get("/{name}/connection", dh.GetConnection)
+		r.Put("/{name}/connection", dh.UpdateConnection)
+		r.Put("/{name}/dkim_authority", dh.UpdateDKIMAuthority)
+		r.Put("/{name}/dkim_selector", dh.UpdateDKIMSelector)
 	})
 
 	// Mailgun API routes (placeholder)

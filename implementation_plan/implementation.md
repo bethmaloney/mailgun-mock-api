@@ -7,7 +7,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | Phase | Area | Status | Notes |
 |-------|------|--------|-------|
 | 0 | Foundation & Cross-cutting | in progress | Auth, pagination, config, response formatting |
-| 1 | Domains | in progress | CRUD, verification, tracking, connection settings |
+| 1 | Domains | done | CRUD, verification, tracking, connection settings |
 | 2 | Credentials & Keys | pending | SMTP creds, API keys, IP allowlist |
 | 3 | Messages & Storage | pending | Send, store, retrieve, resend |
 | 4 | Events & Logs | pending | Generation pipeline, querying, mock triggers |
@@ -90,18 +90,18 @@ Foundation for all other resources. Nothing else works without domains.
 - [x] Generate realistic DNS record values on domain creation
 
 ### Tracking Settings
-- [ ] `GET /v3/domains/{name}/tracking` — get all tracking settings
-- [ ] `PUT /v3/domains/{name}/tracking/open` — update open tracking (active bool)
-- [ ] `PUT /v3/domains/{name}/tracking/click` — update click tracking (active yes/no/htmlonly)
-- [ ] `PUT /v3/domains/{name}/tracking/unsubscribe` — update unsubscribe tracking (active bool, custom_html_footer, custom_text_footer)
+- [x] `GET /v3/domains/{name}/tracking` — get all tracking settings
+- [x] `PUT /v3/domains/{name}/tracking/open` — update open tracking (active bool)
+- [x] `PUT /v3/domains/{name}/tracking/click` — update click tracking (active yes/no/htmlonly)
+- [x] `PUT /v3/domains/{name}/tracking/unsubscribe` — update unsubscribe tracking (active bool, custom_html_footer, custom_text_footer)
 
 ### Connection Settings
-- [ ] `GET /v3/domains/{name}/connection` — get connection settings
-- [ ] `PUT /v3/domains/{name}/connection` — update (require_tls, skip_verification)
+- [x] `GET /v3/domains/{name}/connection` — get connection settings
+- [x] `PUT /v3/domains/{name}/connection` — update (require_tls, skip_verification)
 
 ### DKIM Management
-- [ ] `PUT /v3/domains/{name}/dkim_authority` — enable/disable
-- [ ] `PUT /v3/domains/{name}/dkim_selector` — update selector
+- [x] `PUT /v3/domains/{name}/dkim_authority` — enable/disable
+- [x] `PUT /v3/domains/{name}/dkim_selector` — update selector
 
 ---
 

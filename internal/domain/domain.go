@@ -39,6 +39,21 @@ type Domain struct {
 	DKIMSelector               string  `json:"-"`
 	DKIMAuthoritySelf          bool    `json:"-"`
 	SubaccountID               *string `json:"subaccount_id,omitempty"`
+
+	// Tracking settings
+	TrackingOpenActive            bool   `json:"-"`
+	TrackingOpenPlaceAtTop        bool   `json:"-"`
+	TrackingClickActive           string `json:"-"` // "true", "false", or "htmlonly"
+	TrackingUnsubscribeActive     bool   `json:"-"`
+	TrackingUnsubscribeHTMLFooter string `json:"-"`
+	TrackingUnsubscribeTextFooter string `json:"-"`
+}
+
+// TrackingSetting is a GORM model used for migration compatibility.
+// Tracking data is stored directly on the Domain model.
+type TrackingSetting struct {
+	database.BaseModel
+	DomainID string `gorm:"index"`
 }
 
 // DNSRecord represents a DNS record associated with a domain.
@@ -143,6 +158,7 @@ type Handlers struct {
 // NewHandlers creates a new Handlers instance. It resets domain-related data
 // in the database to ensure a clean state for the mock server.
 func NewHandlers(db *gorm.DB, config *mock.MockConfig) *Handlers {
+	db.Unscoped().Where("1 = 1").Delete(&TrackingSetting{})
 	db.Unscoped().Where("1 = 1").Delete(&DNSRecord{})
 	db.Unscoped().Where("1 = 1").Delete(&Domain{})
 	return &Handlers{db: db, config: config}
@@ -402,6 +418,13 @@ func (h *Handlers) CreateDomain(w http.ResponseWriter, r *http.Request) {
 		MessageTTL:                 messageTTL,
 		DKIMSelector:               "pic",
 		DKIMAuthoritySelf:          dkimAuthSelf,
+
+		// Tracking defaults
+		TrackingOpenActive:            true,
+		TrackingClickActive:           "true",
+		TrackingUnsubscribeActive:     true,
+		TrackingUnsubscribeHTMLFooter: "\n<br>\n<p><a href=\"%unsubscribe_url%\">unsubscribe</a></p>\n",
+		TrackingUnsubscribeTextFooter: "\n\nTo unsubscribe click: <%unsubscribe_url%>\n\n",
 	}
 
 	err := h.db.Transaction(func(tx *gorm.DB) error {
@@ -620,4 +643,139 @@ func (h *Handlers) VerifyDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.RespondJSON(w, http.StatusOK, resp)
+}
+
+// ---------------------------------------------------------------------------
+// Connection / DKIM Response DTOs
+// ---------------------------------------------------------------------------
+
+type connectionDTO struct {
+	RequireTLS       bool `json:"require_tls"`
+	SkipVerification bool `json:"skip_verification"`
+}
+
+// ---------------------------------------------------------------------------
+// GetConnection handles GET /v3/domains/{name}/connection.
+// ---------------------------------------------------------------------------
+
+func (h *Handlers) GetConnection(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var d Domain
+	if err := h.db.Where("name = ?", name).First(&d).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, "Domain not found")
+		return
+	}
+
+	resp := map[string]connectionDTO{
+		"connection": {
+			RequireTLS:       d.RequireTLS,
+			SkipVerification: d.SkipVerification,
+		},
+	}
+
+	response.RespondJSON(w, http.StatusOK, resp)
+}
+
+// ---------------------------------------------------------------------------
+// UpdateConnection handles PUT /v3/domains/{name}/connection.
+// ---------------------------------------------------------------------------
+
+func (h *Handlers) UpdateConnection(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var d Domain
+	if err := h.db.Where("name = ?", name).First(&d).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, "Domain not found")
+		return
+	}
+
+	requireTLS := request.ParseFormValue(r, "require_tls")
+	if requireTLS != "" {
+		d.RequireTLS = requireTLS == "true"
+	}
+
+	skipVerification := request.ParseFormValue(r, "skip_verification")
+	if skipVerification != "" {
+		d.SkipVerification = skipVerification == "true"
+	}
+
+	if err := h.db.Save(&d).Error; err != nil {
+		response.RespondError(w, http.StatusInternalServerError, "Failed to update connection settings")
+		return
+	}
+
+	resp := map[string]interface{}{
+		"message": "Domain connection settings have been updated",
+		"connection": connectionDTO{
+			RequireTLS:       d.RequireTLS,
+			SkipVerification: d.SkipVerification,
+		},
+	}
+
+	response.RespondJSON(w, http.StatusOK, resp)
+}
+
+// ---------------------------------------------------------------------------
+// UpdateDKIMAuthority handles PUT /v3/domains/{name}/dkim_authority.
+// ---------------------------------------------------------------------------
+
+func (h *Handlers) UpdateDKIMAuthority(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var d Domain
+	if err := h.db.Where("name = ?", name).First(&d).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, "Domain not found")
+		return
+	}
+
+	selfVal := request.ParseFormValue(r, "self")
+	newSelf := selfVal == "true"
+	changed := newSelf != d.DKIMAuthoritySelf
+
+	d.DKIMAuthoritySelf = newSelf
+
+	if err := h.db.Save(&d).Error; err != nil {
+		response.RespondError(w, http.StatusInternalServerError, "Failed to update DKIM authority")
+		return
+	}
+
+	var sendingRecords []DNSRecord
+	h.db.Where("domain_id = ? AND category = ?", d.ID, "sending").Find(&sendingRecords)
+
+	resp := map[string]interface{}{
+		"message":             "Domain DKIM authority has been changed",
+		"changed":             changed,
+		"sending_dns_records": toDNSRecordResponses(sendingRecords),
+	}
+
+	response.RespondJSON(w, http.StatusOK, resp)
+}
+
+// ---------------------------------------------------------------------------
+// UpdateDKIMSelector handles PUT /v3/domains/{name}/dkim_selector.
+// ---------------------------------------------------------------------------
+
+func (h *Handlers) UpdateDKIMSelector(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var d Domain
+	if err := h.db.Where("name = ?", name).First(&d).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, "Domain not found")
+		return
+	}
+
+	selector := request.ParseFormValue(r, "dkim_selector")
+	if selector != "" {
+		d.DKIMSelector = selector
+	}
+
+	if err := h.db.Save(&d).Error; err != nil {
+		response.RespondError(w, http.StatusInternalServerError, "Failed to update DKIM selector")
+		return
+	}
+
+	response.RespondJSON(w, http.StatusOK, map[string]string{
+		"message": "Domain DKIM selector has been updated",
+	})
 }
