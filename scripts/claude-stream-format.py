@@ -32,9 +32,24 @@ def format_tool_use(name, inp):
     if name == "Grep":
         return f"🔍 Grep: {inp.get('pattern', '?')}"
     if name == "TodoWrite":
+        todos = inp.get("todos", [])
+        if todos:
+            items = [t.get("content", t.get("subject", "")) for t in todos[:3] if isinstance(t, dict)]
+            summary = ", ".join(i for i in items if i)
+            return f"📋 TodoWrite: {truncate(summary)}" if summary else "📋 TodoWrite"
         return "📋 TodoWrite"
-    if name == "Task":
-        return f"🤖 Task: {inp.get('description', '?')}"
+    if name == "TaskCreate":
+        return f"📋 TaskCreate: {truncate(inp.get('subject', '?'))}"
+    if name == "TaskUpdate":
+        status = inp.get("status", "")
+        task_id = inp.get("taskId", "?")
+        return f"📋 TaskUpdate: #{task_id} → {status}" if status else f"📋 TaskUpdate: #{task_id}"
+    if name == "TaskList":
+        return "📋 TaskList"
+    if name == "Agent":
+        desc = inp.get("description", "?")
+        agent_type = inp.get("subagent_type", "")
+        return f"🤖 Agent ({agent_type}): {desc}" if agent_type else f"🤖 Agent: {desc}"
     if name == "Skill":
         return f"⚡ Skill: {inp.get('skill', '?')}"
     return f"🔧 {name}"
