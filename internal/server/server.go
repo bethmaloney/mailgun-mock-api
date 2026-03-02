@@ -33,8 +33,16 @@ func New(db *gorm.DB) http.Handler {
 	})
 
 	// Mock management routes
+	h := mock.NewHandlers(db)
 	r.Route("/mock", func(r chi.Router) {
 		r.Get("/health", mock.HealthHandler)
+		r.Get("/config", h.GetConfig)
+		r.Put("/config", h.UpdateConfig)
+		r.Post("/reset", h.ResetAll)
+		// Order matters: "/reset/messages" must be registered before "/reset/{domain}"
+		// so that chi matches the static path before the wildcard.
+		r.Post("/reset/messages", h.ResetMessages)
+		r.Post("/reset/{domain}", h.ResetDomain)
 	})
 
 	// Serve embedded Vue SPA

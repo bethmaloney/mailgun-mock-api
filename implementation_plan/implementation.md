@@ -6,7 +6,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 
 | Phase | Area | Status | Notes |
 |-------|------|--------|-------|
-| 0 | Foundation & Cross-cutting | pending | Auth, pagination, config, response formatting |
+| 0 | Foundation & Cross-cutting | in progress | Auth, pagination, config, response formatting |
 | 1 | Domains | pending | CRUD, verification, tracking, connection settings |
 | 2 | Credentials & Keys | pending | SMTP creds, API keys, IP allowlist |
 | 3 | Messages & Storage | pending | Send, store, retrieve, resend |
@@ -32,8 +32,8 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 Shared infrastructure referenced by every feature area. Must be complete before domain-specific work begins.
 
 ### Database & Models
-- [ ] Define GORM base model with common fields (ID, timestamps) and consistent primary key strategy
-- [ ] Set up migration framework — auto-migrate all models on startup
+- [x] Define GORM base model with common fields (ID, timestamps) and consistent primary key strategy
+- [x] Set up migration framework — auto-migrate all models on startup
 - [ ] Add seed data support (e.g., default IPs for IP Pools, see [ips-and-pools.md](./ips-and-pools.md))
 
 ### Authentication Middleware
@@ -47,13 +47,13 @@ Shared infrastructure referenced by every feature area. Must be complete before 
 - [ ] Token-based pagination (v1 analytics endpoints) — `cursor` in response body
 
 ### Global Mock Configuration
-- [ ] Define config struct with all mock settings: auto-delivery mode, domain verification mode, webhook retry mode, auth mode, storage limits — consolidated from [web-ui.md](./web-ui.md)
-- [ ] `GET /mock/config` and `PUT /mock/config` endpoints
-- [ ] Pass config reference to all subsystems so changes take effect immediately
+- [x] Define config struct with all mock settings: auto-delivery mode, domain verification mode, webhook retry mode, auth mode, storage limits — consolidated from [web-ui.md](./web-ui.md)
+- [x] `GET /mock/config` and `PUT /mock/config` endpoints
+- [x] Pass config reference to all subsystems so changes take effect immediately
 
 ### Response Formatting
-- [ ] Standard Mailgun success envelope: `{ "message": "...", "id": "..." }` or `{ "items": [...], "paging": {...} }`
-- [ ] Standard error responses: `{ "message": "..." }` with appropriate HTTP status codes
+- [x] Standard Mailgun success envelope: `{ "message": "...", "id": "..." }` or `{ "items": [...], "paging": {...} }`
+- [x] Standard error responses: `{ "message": "..." }` with appropriate HTTP status codes
 - [ ] Support both `application/json` and `multipart/form-data` request parsing (many endpoints accept both)
 - [ ] Handle `application/x-www-form-urlencoded` for credential/key endpoints
 
@@ -63,10 +63,10 @@ Shared infrastructure referenced by every feature area. Must be complete before 
 - [ ] List endpoints filter by subaccount context; `include_subaccounts` param bypasses filter
 
 ### Mock Utility Endpoints
-- [ ] `POST /mock/reset` — clear all data
-- [ ] `POST /mock/reset/{domain}` — clear data for a single domain
-- [ ] `POST /mock/reset/messages` — clear only messages and events
-- [ ] `GET /mock/health` — health check (already exists)
+- [x] `POST /mock/reset` — clear all data
+- [x] `POST /mock/reset/{domain}` — clear data for a single domain
+- [x] `POST /mock/reset/messages` — clear only messages and events
+- [x] `GET /mock/health` — health check (already exists)
 
 ---
 
