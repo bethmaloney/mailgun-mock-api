@@ -8,7 +8,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 |-------|------|--------|-------|
 | 0 | Foundation & Cross-cutting | in progress | Auth, pagination, config, response formatting |
 | 1 | Domains | done | CRUD, verification, tracking, connection settings |
-| 2 | Credentials & Keys | pending | SMTP creds, API keys, IP allowlist |
+| 2 | Credentials & Keys | in progress | SMTP creds, API keys, IP allowlist |
 | 3 | Messages & Storage | pending | Send, store, retrieve, resend |
 | 4 | Events & Logs | pending | Generation pipeline, querying, mock triggers |
 | 5 | Suppressions | pending | Bounces, complaints, unsubscribes, allowlist |
@@ -112,11 +112,11 @@ Auth infrastructure for the rest of the API. Implements alongside or immediately
 > Plan doc: [credentials-and-keys.md](./credentials-and-keys.md)
 
 ### SMTP Credentials
-- [ ] Model: `SMTPCredential` (domain-scoped, login as `user@domain`)
-- [ ] `GET /v3/domains/{domain}/credentials` — list with pagination
-- [ ] `POST /v3/domains/{domain}/credentials` — create (password 5–32 chars)
-- [ ] `PUT /v3/domains/{domain}/credentials/{login}` — update password
-- [ ] `DELETE /v3/domains/{domain}/credentials/{login}` — delete
+- [x] Model: `SMTPCredential` (domain-scoped, login as `user@domain`)
+- [x] `GET /v3/domains/{domain}/credentials` — list with pagination
+- [x] `POST /v3/domains/{domain}/credentials` — create (password 5–32 chars)
+- [x] `PUT /v3/domains/{domain}/credentials/{login}` — update password
+- [x] `DELETE /v3/domains/{domain}/credentials/{login}` — delete
 
 ### API Keys
 - [ ] Model: `APIKey` with role, domain scope, active status, description

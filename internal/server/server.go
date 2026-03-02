@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net/http"
 
+	"github.com/bethmaloney/mailgun-mock-api/internal/credential"
 	"github.com/bethmaloney/mailgun-mock-api/internal/domain"
 	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
@@ -31,13 +32,16 @@ func New(db *gorm.DB) http.Handler {
 	}))
 
 	// Run domain model migrations.
-	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{})
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
 
 	// Domain API routes
 	dh := domain.NewHandlers(db, h.Config())
+
+	// Credential API handlers
+	ch := credential.NewHandlers(db)
 
 	r.Route("/v4/domains", func(r chi.Router) {
 		r.Use(appMiddleware.BasicAuth(h.Config()))
@@ -59,6 +63,13 @@ func New(db *gorm.DB) http.Handler {
 		r.Put("/{name}/connection", dh.UpdateConnection)
 		r.Put("/{name}/dkim_authority", dh.UpdateDKIMAuthority)
 		r.Put("/{name}/dkim_selector", dh.UpdateDKIMSelector)
+
+		// Credential routes
+		r.Get("/{name}/credentials", ch.ListCredentials)
+		r.Post("/{name}/credentials", ch.CreateCredential)
+		r.Delete("/{name}/credentials", ch.DeleteAllCredentials)
+		r.Put("/{name}/credentials/{spec}", ch.UpdateCredential)
+		r.Delete("/{name}/credentials/{spec}", ch.DeleteCredential)
 	})
 
 	// Mailgun API routes (placeholder)
