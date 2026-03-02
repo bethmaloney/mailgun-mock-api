@@ -22,8 +22,8 @@ import (
 // SMTPCredential represents an SMTP credential associated with a domain.
 type SMTPCredential struct {
 	database.BaseModel
-	DomainName string `gorm:"index" json:"-"`
-	Login      string `gorm:"index" json:"login"`
+	DomainName string `gorm:"uniqueIndex:idx_domain_login" json:"-"`
+	Login      string `gorm:"uniqueIndex:idx_domain_login" json:"login"`
 	Password   string `json:"-"`
 }
 
@@ -267,12 +267,9 @@ func (h *Handlers) DeleteAllCredentials(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Count credentials for this domain.
-	var count int64
-	h.db.Model(&SMTPCredential{}).Where("domain_name = ?", domainName).Count(&count)
-
 	// Delete all credentials for this domain (hard delete).
-	h.db.Unscoped().Where("domain_name = ?", domainName).Delete(&SMTPCredential{})
+	result := h.db.Unscoped().Where("domain_name = ?", domainName).Delete(&SMTPCredential{})
+	count := result.RowsAffected
 
 	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "All domain credentials have been deleted",
