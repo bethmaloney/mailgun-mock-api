@@ -42,9 +42,9 @@ Shared infrastructure referenced by every feature area. Must be complete before 
 - [x] Extract domain from URL path and validate it exists (shared across all `/{domain}/` routes)
 
 ### Shared Pagination
-- [ ] Cursor/URL-based pagination (events, suppressions, templates, tags, mailing lists) — opaque `next`/`previous` URLs per [events-and-logs.md](./events-and-logs.md)
-- [ ] Skip/limit offset pagination (mailing list members, routes) — `skip` + `limit` params
-- [ ] Token-based pagination (v1 analytics endpoints) — `cursor` in response body
+- [x] Cursor/URL-based pagination (events, suppressions, templates, tags, mailing lists) — opaque `next`/`previous` URLs per [events-and-logs.md](./events-and-logs.md)
+- [x] Skip/limit offset pagination (mailing list members, routes) — `skip` + `limit` params
+- [x] Token-based pagination (v1 analytics endpoints) — `cursor` in response body
 
 ### Global Mock Configuration
 - [x] Define config struct with all mock settings: auto-delivery mode, domain verification mode, webhook retry mode, auth mode, storage limits — consolidated from [web-ui.md](./web-ui.md)
