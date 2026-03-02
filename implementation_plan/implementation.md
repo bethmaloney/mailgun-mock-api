@@ -54,8 +54,8 @@ Shared infrastructure referenced by every feature area. Must be complete before 
 ### Response Formatting
 - [x] Standard Mailgun success envelope: `{ "message": "...", "id": "..." }` or `{ "items": [...], "paging": {...} }`
 - [x] Standard error responses: `{ "message": "..." }` with appropriate HTTP status codes
-- [ ] Support both `application/json` and `multipart/form-data` request parsing (many endpoints accept both)
-- [ ] Handle `application/x-www-form-urlencoded` for credential/key endpoints
+- [x] Support both `application/json` and `multipart/form-data` request parsing (many endpoints accept both)
+- [x] Handle `application/x-www-form-urlencoded` for credential/key endpoints
 
 ### Subaccount Scoping (cross-cutting)
 - [ ] Middleware to extract `X-Mailgun-On-Behalf-Of` header and set subaccount context on request — see [subaccounts.md](./subaccounts.md)
