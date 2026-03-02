@@ -96,6 +96,11 @@ func ParseCursorParams(r *http.Request) CursorParams {
 
 // GeneratePagingURLs constructs a PagingURLs struct from the given base URL,
 // limit, pivot value, and whether more results exist beyond the current page.
+//
+// The pivot parameter should be the cursor value for navigating to the next/previous
+// page — typically the last item's ID from the current page results, NOT the incoming
+// request's pivot. The caller is responsible for determining the appropriate pivot
+// value after fetching results.
 func GeneratePagingURLs(baseURL string, limit int, pivot string, hasMore bool) PagingURLs {
 	limitStr := strconv.Itoa(limit)
 
@@ -121,12 +126,10 @@ func GeneratePagingURLs(baseURL string, limit int, pivot string, hasMore bool) P
 
 	if hasMore && pivot != "" {
 		paging.Next = buildURL("next", pivot)
-	} else if hasMore {
-		// First page with hasMore but no pivot — next still empty
-		// since we don't have a cursor yet.
 	}
 
 	if pivot != "" {
+		// "prev" (not "previous") is the correct query parameter value per the Mailgun API.
 		paging.Previous = buildURL("prev", pivot)
 	}
 

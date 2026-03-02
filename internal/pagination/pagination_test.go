@@ -917,3 +917,49 @@ func TestTokenPagination_ParsesCursorFromRequest(t *testing.T) {
 		}
 	})
 }
+
+func TestBuildTokenPaginationMeta(t *testing.T) {
+	meta := pagination.BuildTokenPaginationMeta("next-cursor-token", 150, "timestamp:desc", 100)
+
+	t.Run("cursor matches", func(t *testing.T) {
+		if meta.Cursor != "next-cursor-token" {
+			t.Errorf("expected Cursor %q, got %q", "next-cursor-token", meta.Cursor)
+		}
+	})
+
+	t.Run("total matches", func(t *testing.T) {
+		if meta.Total != 150 {
+			t.Errorf("expected Total 150, got %d", meta.Total)
+		}
+	})
+
+	t.Run("sort matches", func(t *testing.T) {
+		if meta.Sort != "timestamp:desc" {
+			t.Errorf("expected Sort %q, got %q", "timestamp:desc", meta.Sort)
+		}
+	})
+
+	t.Run("limit matches", func(t *testing.T) {
+		if meta.Limit != 100 {
+			t.Errorf("expected Limit 100, got %d", meta.Limit)
+		}
+	})
+
+	t.Run("serializes to JSON with correct field names", func(t *testing.T) {
+		data, err := json.Marshal(meta)
+		if err != nil {
+			t.Fatalf("failed to marshal TokenPaginationMeta: %v", err)
+		}
+
+		var decoded map[string]interface{}
+		if err := json.Unmarshal(data, &decoded); err != nil {
+			t.Fatalf("failed to unmarshal: %v", err)
+		}
+
+		for _, key := range []string{"cursor", "total", "sort", "limit"} {
+			if _, ok := decoded[key]; !ok {
+				t.Errorf("expected %q key in JSON output", key)
+			}
+		}
+	})
+}
