@@ -1,7 +1,6 @@
 package domain_test
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,14 +17,14 @@ import (
 // ---------------------------------------------------------------------------
 
 // setupTrackingTestDB creates an in-memory SQLite database for tracking tests
-// with Domain, DNSRecord, and TrackingSetting tables migrated.
+// with Domain and DNSRecord tables migrated.
 func setupTrackingTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
-	if err := db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &domain.TrackingSetting{}); err != nil {
+	if err := db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -913,5 +912,3 @@ func TestGetTracking_IsolatedPerDomain(t *testing.T) {
 	})
 }
 
-// Ensure fmt is used (referenced by helpers in the same package).
-var _ = fmt.Sprintf

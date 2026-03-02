@@ -49,13 +49,6 @@ type Domain struct {
 	TrackingUnsubscribeTextFooter string `json:"-"`
 }
 
-// TrackingSetting is a GORM model used for migration compatibility.
-// Tracking data is stored directly on the Domain model.
-type TrackingSetting struct {
-	database.BaseModel
-	DomainID string `gorm:"index"`
-}
-
 // DNSRecord represents a DNS record associated with a domain.
 type DNSRecord struct {
 	database.BaseModel
@@ -158,7 +151,6 @@ type Handlers struct {
 // NewHandlers creates a new Handlers instance. It resets domain-related data
 // in the database to ensure a clean state for the mock server.
 func NewHandlers(db *gorm.DB, config *mock.MockConfig) *Handlers {
-	db.Unscoped().Where("1 = 1").Delete(&TrackingSetting{})
 	db.Unscoped().Where("1 = 1").Delete(&DNSRecord{})
 	db.Unscoped().Where("1 = 1").Delete(&Domain{})
 	return &Handlers{db: db, config: config}
@@ -730,6 +722,10 @@ func (h *Handlers) UpdateDKIMAuthority(w http.ResponseWriter, r *http.Request) {
 	}
 
 	selfVal := request.ParseFormValue(r, "self")
+	if selfVal == "" {
+		response.RespondError(w, http.StatusBadRequest, "self parameter is required")
+		return
+	}
 	newSelf := selfVal == "true"
 	changed := newSelf != d.DKIMAuthoritySelf
 
@@ -741,7 +737,10 @@ func (h *Handlers) UpdateDKIMAuthority(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var sendingRecords []DNSRecord
-	h.db.Where("domain_id = ? AND category = ?", d.ID, "sending").Find(&sendingRecords)
+	if err := h.db.Where("domain_id = ? AND category = ?", d.ID, "sending").Find(&sendingRecords).Error; err != nil {
+		response.RespondError(w, http.StatusInternalServerError, "Failed to load DNS records")
+		return
+	}
 
 	resp := map[string]interface{}{
 		"message":             "Domain DKIM authority has been changed",

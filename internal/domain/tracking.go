@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -165,7 +166,13 @@ func (h *Handlers) UpdateClickTracking(w http.ResponseWriter, r *http.Request) {
 	activeVal := request.ParseFormValue(r, "active")
 	if activeVal != "" {
 		activeVal = strings.ToLower(activeVal)
-		d.TrackingClickActive = activeVal
+		switch activeVal {
+		case "true", "false", "htmlonly":
+			d.TrackingClickActive = activeVal
+		default:
+			response.RespondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value for active: %s. Must be true, false, or htmlonly", activeVal))
+			return
+		}
 	}
 
 	if err := h.db.Save(&d).Error; err != nil {

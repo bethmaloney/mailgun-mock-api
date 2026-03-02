@@ -31,7 +31,7 @@ func New(db *gorm.DB) http.Handler {
 	}))
 
 	// Run domain model migrations.
-	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &domain.TrackingSetting{})
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
