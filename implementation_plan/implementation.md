@@ -37,9 +37,9 @@ Shared infrastructure referenced by every feature area. Must be complete before 
 - [ ] Add seed data support (e.g., default IPs for IP Pools, see [ips-and-pools.md](./ips-and-pools.md))
 
 ### Authentication Middleware
-- [ ] Implement HTTP Basic Auth middleware (`username: "api"`, `password: <key>`) — see [credentials-and-keys.md](./credentials-and-keys.md)
-- [ ] Support configurable auth mode: `none` (accept anything), `single` (one master key), `full` (per-key RBAC) — see [web-ui.md](./web-ui.md) mock config
-- [ ] Extract domain from URL path and validate it exists (shared across all `/{domain}/` routes)
+- [x] Implement HTTP Basic Auth middleware (`username: "api"`, `password: <key>`) — see [credentials-and-keys.md](./credentials-and-keys.md)
+- [x] Support configurable auth mode: `none` (accept anything), `single` (one master key), `full` (per-key RBAC) — see [web-ui.md](./web-ui.md) mock config
+- [x] Extract domain from URL path and validate it exists (shared across all `/{domain}/` routes)
 
 ### Shared Pagination
 - [ ] Cursor/URL-based pagination (events, suppressions, templates, tags, mailing lists) — opaque `next`/`previous` URLs per [events-and-logs.md](./events-and-logs.md)
