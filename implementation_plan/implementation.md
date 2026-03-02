@@ -120,11 +120,11 @@ Auth infrastructure for the rest of the API. Implements alongside or immediately
 
 ### API Keys
 - [x] Model: `APIKey` with role, domain scope, active status, description
-- [x] `GET /v3/keys` — list all keys
-- [x] `POST /v3/keys` — create key (`key-` prefix + 48 hex chars, secret shown once)
-- [x] `DELETE /v3/keys/{id}` — delete/deactivate
-- [x] `POST /v3/keys/{id}/regenerate` — regenerate secret
-- [x] `GET /v3/keys/public` — get public verification key
+- [x] `GET /v1/keys` — list all keys
+- [x] `POST /v1/keys` — create key (`key-` prefix + 48 hex chars, secret shown once)
+- [x] `DELETE /v1/keys/{id}` — delete/deactivate
+- [x] `POST /v1/keys/{id}/regenerate` — regenerate secret
+- [x] `GET /v1/keys/public` — get public verification key
 
 ### IP Allowlist (stub)
 - [ ] `GET /v2/ip_whitelist` — list
