@@ -27,12 +27,6 @@ func (b *BaseModel) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// Domain is a placeholder model to verify GORM connectivity.
-type Domain struct {
-	gorm.Model
-	Name string `gorm:"uniqueIndex"`
-}
-
 func Connect(cfg *config.Config) (*gorm.DB, error) {
 	var dialector gorm.Dialector
 
@@ -48,10 +42,6 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 	db, err := gorm.Open(dialector, &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	if err := db.AutoMigrate(&Domain{}); err != nil {
-		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	return db, nil

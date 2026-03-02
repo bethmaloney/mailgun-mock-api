@@ -7,7 +7,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | Phase | Area | Status | Notes |
 |-------|------|--------|-------|
 | 0 | Foundation & Cross-cutting | in progress | Auth, pagination, config, response formatting |
-| 1 | Domains | pending | CRUD, verification, tracking, connection settings |
+| 1 | Domains | in progress | CRUD, verification, tracking, connection settings |
 | 2 | Credentials & Keys | pending | SMTP creds, API keys, IP allowlist |
 | 3 | Messages & Storage | pending | Send, store, retrieve, resend |
 | 4 | Events & Logs | pending | Generation pipeline, querying, mock triggers |
@@ -77,17 +77,17 @@ Foundation for all other resources. Nothing else works without domains.
 > Plan doc: [domains.md](./domains.md)
 
 ### Domain CRUD
-- [ ] Model: `Domain` with all fields (name, state, type, spam_action, wildcard, web_scheme, etc.)
-- [ ] `POST /v4/domains` — create domain with auto-generated DNS records (SPF, DKIM, MX, CNAME)
-- [ ] `GET /v4/domains` — list with pagination, `state` and `authority` filters
-- [ ] `GET /v4/domains/{name}` — get single domain with DNS records
-- [ ] `PUT /v4/domains/{name}` — update mutable fields (spam_action, wildcard, web_scheme, web_prefix)
-- [ ] `DELETE /v4/domains/{name}` — soft delete
+- [x] Model: `Domain` with all fields (name, state, type, spam_action, wildcard, web_scheme, etc.)
+- [x] `POST /v4/domains` — create domain with auto-generated DNS records (SPF, DKIM, MX, CNAME)
+- [x] `GET /v4/domains` — list with pagination, `state` and `authority` filters
+- [x] `GET /v4/domains/{name}` — get single domain with DNS records
+- [x] `PUT /v4/domains/{name}` — update mutable fields (spam_action, wildcard, web_scheme, web_prefix)
+- [x] `DELETE /v3/domains/{name}` — soft delete
 
 ### Domain Verification
-- [ ] `PUT /v4/domains/{name}/verify` — verify DNS records
-- [ ] Mock verification modes: `auto` (always pass), `manual` (require explicit verify call) — controlled via mock config
-- [ ] Generate realistic DNS record values on domain creation
+- [x] `PUT /v4/domains/{name}/verify` — verify DNS records
+- [x] Mock verification modes: `auto` (always pass), `manual` (require explicit verify call) — controlled via mock config
+- [x] Generate realistic DNS record values on domain creation
 
 ### Tracking Settings
 - [ ] `GET /v3/domains/{name}/tracking` — get all tracking settings

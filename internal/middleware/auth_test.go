@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/bethmaloney/mailgun-mock-api/internal/database"
 	"github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
@@ -20,7 +19,16 @@ import (
 // Helpers
 // ---------------------------------------------------------------------------
 
-// setupTestDB creates a fresh in-memory SQLite database with the Domain table
+// testDomain is a test-local struct that maps to the domains table.
+// It avoids importing the domain package (which would create a circular
+// dependency) while providing enough fields to set up test data.
+type testDomain struct {
+	Name string `gorm:"uniqueIndex"`
+}
+
+func (testDomain) TableName() string { return "domains" }
+
+// setupTestDB creates a fresh in-memory SQLite database with the domains table
 // migrated and ready for use.
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -28,8 +36,8 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
-	if err := db.AutoMigrate(&database.Domain{}); err != nil {
-		t.Fatalf("failed to migrate Domain table: %v", err)
+	if err := db.AutoMigrate(&testDomain{}); err != nil {
+		t.Fatalf("failed to migrate domains table: %v", err)
 	}
 	return db
 }
@@ -549,7 +557,7 @@ func TestRequireDomain_DomainExists(t *testing.T) {
 	db := setupTestDB(t)
 
 	// Insert a test domain into the database.
-	domain := database.Domain{Name: "example.com"}
+	domain := testDomain{Name: "example.com"}
 	if err := db.Create(&domain).Error; err != nil {
 		t.Fatalf("failed to create test domain: %v", err)
 	}
@@ -634,7 +642,7 @@ func TestRequireDomain_EmptyDomainParameter(t *testing.T) {
 func TestRequireDomain_DomainNameParam(t *testing.T) {
 	db := setupTestDB(t)
 
-	domain := database.Domain{Name: "mail.example.org"}
+	domain := testDomain{Name: "mail.example.org"}
 	if err := db.Create(&domain).Error; err != nil {
 		t.Fatalf("failed to create test domain: %v", err)
 	}
@@ -666,7 +674,7 @@ func TestRequireDomain_DomainNameParam(t *testing.T) {
 func TestRequireDomain_NameParam(t *testing.T) {
 	db := setupTestDB(t)
 
-	domain := database.Domain{Name: "test.mailgun.org"}
+	domain := testDomain{Name: "test.mailgun.org"}
 	if err := db.Create(&domain).Error; err != nil {
 		t.Fatalf("failed to create test domain: %v", err)
 	}
@@ -725,7 +733,7 @@ func TestRequireDomain_MultipleDomains(t *testing.T) {
 	// Insert multiple domains.
 	domains := []string{"alpha.com", "beta.com", "gamma.com"}
 	for _, name := range domains {
-		d := database.Domain{Name: name}
+		d := testDomain{Name: name}
 		if err := db.Create(&d).Error; err != nil {
 			t.Fatalf("failed to create domain %q: %v", name, err)
 		}

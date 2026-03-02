@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"net/http"
 
+	"github.com/bethmaloney/mailgun-mock-api/internal/domain"
+	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -28,12 +30,32 @@ func New(db *gorm.DB) http.Handler {
 		MaxAge:           300,
 	}))
 
-	// Mailgun API routes (placeholder)
-	r.Route("/api/v3", func(r chi.Router) {
-	})
+	// Run domain model migrations.
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
+
+	// Domain API routes
+	dh := domain.NewHandlers(db, h.Config())
+
+	r.Route("/v4/domains", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Post("/", dh.CreateDomain)
+		r.Get("/", dh.ListDomains)
+		r.Get("/{name}", dh.GetDomain)
+		r.Put("/{name}", dh.UpdateDomain)
+		r.Put("/{name}/verify", dh.VerifyDomain)
+	})
+
+	r.Route("/v3/domains", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Delete("/{name}", dh.DeleteDomain)
+	})
+
+	// Mailgun API routes (placeholder)
+	r.Route("/api/v3", func(r chi.Router) {
+	})
 	r.Route("/mock", func(r chi.Router) {
 		r.Get("/health", mock.HealthHandler)
 		r.Get("/config", h.GetConfig)

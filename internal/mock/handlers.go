@@ -102,6 +102,11 @@ func NewHandlers(db *gorm.DB) *Handlers {
 	}
 }
 
+// Config returns a pointer to the mock configuration.
+func (h *Handlers) Config() *MockConfig {
+	return &h.config
+}
+
 // GetConfig returns the current mock configuration as JSON.
 func (h *Handlers) GetConfig(w http.ResponseWriter, r *http.Request) {
 	response.RespondJSON(w, http.StatusOK, h.config)

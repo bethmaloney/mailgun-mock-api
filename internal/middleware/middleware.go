@@ -5,7 +5,6 @@ import (
 	"crypto/subtle"
 	"net/http"
 
-	"github.com/bethmaloney/mailgun-mock-api/internal/database"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
 	"github.com/go-chi/chi/v5"
@@ -68,6 +67,14 @@ func BasicAuth(configPtr *mock.MockConfig) func(http.Handler) http.Handler {
 	}
 }
 
+// domainLookup is a minimal struct used to query the domains table without
+// importing the domain package (which would create a circular dependency).
+type domainLookup struct {
+	Name string
+}
+
+func (domainLookup) TableName() string { return "domains" }
+
 // RequireDomain returns a chi-compatible middleware that extracts a domain name
 // from the URL and validates it exists in the database. It checks chi URL params
 // in order: "domain", "domain_name", "name". On success, the domain name is
@@ -88,8 +95,7 @@ func RequireDomain(db *gorm.DB) func(http.Handler) http.Handler {
 				return
 			}
 
-			var domain database.Domain
-			if err := db.Where("name = ?", domainName).First(&domain).Error; err != nil {
+			if err := db.Where("name = ?", domainName).First(&domainLookup{}).Error; err != nil {
 				response.RespondError(w, http.StatusNotFound, "Domain not found")
 				return
 			}

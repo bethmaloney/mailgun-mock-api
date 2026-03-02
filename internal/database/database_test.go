@@ -57,7 +57,7 @@ func TestConnect_UnsupportedDriver(t *testing.T) {
 	})
 }
 
-func TestConnect_MigratesDomainTable(t *testing.T) {
+func TestConnect_ReturnsUsableDB(t *testing.T) {
 	cfg := &config.Config{
 		DBDriver:    "sqlite",
 		DatabaseURL: "file::memory:?cache=shared",
@@ -68,39 +68,26 @@ func TestConnect_MigratesDomainTable(t *testing.T) {
 		t.Fatalf("failed to connect: %v", err)
 	}
 
-	t.Run("Domain table exists after migration", func(t *testing.T) {
-		if !db.Migrator().HasTable(&database.Domain{}) {
-			t.Error("expected Domain table to exist after Connect")
+	t.Run("can migrate and use a table with BaseModel", func(t *testing.T) {
+		type ConnTestModel struct {
+			database.BaseModel
+			Name string `gorm:"uniqueIndex"`
 		}
-	})
-
-	t.Run("can create and query a Domain record", func(t *testing.T) {
-		domain := database.Domain{Name: "test.example.com"}
-		result := db.Create(&domain)
-		if result.Error != nil {
-			t.Fatalf("failed to create Domain: %v", result.Error)
+		if err := db.AutoMigrate(&ConnTestModel{}); err != nil {
+			t.Fatalf("failed to migrate ConnTestModel: %v", err)
 		}
 
-		var found database.Domain
-		result = db.First(&found, "name = ?", "test.example.com")
-		if result.Error != nil {
-			t.Fatalf("failed to find Domain: %v", result.Error)
+		record := ConnTestModel{Name: "test.example.com"}
+		if err := db.Create(&record).Error; err != nil {
+			t.Fatalf("failed to create record: %v", err)
+		}
+
+		var found ConnTestModel
+		if err := db.First(&found, "name = ?", "test.example.com").Error; err != nil {
+			t.Fatalf("failed to find record: %v", err)
 		}
 		if found.Name != "test.example.com" {
 			t.Errorf("expected name %q, got %q", "test.example.com", found.Name)
-		}
-	})
-
-	t.Run("Domain name has unique constraint", func(t *testing.T) {
-		d1 := database.Domain{Name: "unique-test.example.com"}
-		if err := db.Create(&d1).Error; err != nil {
-			t.Fatalf("failed to create first Domain: %v", err)
-		}
-
-		d2 := database.Domain{Name: "unique-test.example.com"}
-		err := db.Create(&d2).Error
-		if err == nil {
-			t.Error("expected error when creating duplicate domain name, got nil")
 		}
 	})
 }
@@ -286,7 +273,7 @@ func TestBaseModel(t *testing.T) {
 // Multiple Connect calls (idempotent migrations)
 // ---------------------------------------------------------------------------
 
-func TestConnect_IdempotentMigrations(t *testing.T) {
+func TestConnect_IdempotentConnections(t *testing.T) {
 	cfg := &config.Config{
 		DBDriver:    "sqlite",
 		DatabaseURL: "file::memory:?cache=shared",
@@ -298,10 +285,18 @@ func TestConnect_IdempotentMigrations(t *testing.T) {
 		t.Fatalf("first connect failed: %v", err)
 	}
 
+	type IdempotentModel struct {
+		database.BaseModel
+		Name string `gorm:"uniqueIndex"`
+	}
+	if err := db1.AutoMigrate(&IdempotentModel{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
+
 	// Insert a record
-	domain := database.Domain{Name: "idempotent-test.com"}
-	if err := db1.Create(&domain).Error; err != nil {
-		t.Fatalf("failed to create domain: %v", err)
+	record := IdempotentModel{Name: "idempotent-test.com"}
+	if err := db1.Create(&record).Error; err != nil {
+		t.Fatalf("failed to create record: %v", err)
 	}
 
 	// Second connect (should not destroy data)
@@ -310,9 +305,9 @@ func TestConnect_IdempotentMigrations(t *testing.T) {
 		t.Fatalf("second connect failed: %v", err)
 	}
 
-	var found database.Domain
+	var found IdempotentModel
 	result := db2.First(&found, "name = ?", "idempotent-test.com")
 	if result.Error != nil {
-		t.Errorf("expected to find domain after second Connect, got error: %v", result.Error)
+		t.Errorf("expected to find record after second Connect, got error: %v", result.Error)
 	}
 }
