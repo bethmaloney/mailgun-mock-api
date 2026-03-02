@@ -21,6 +21,11 @@ build:
 run: build
     ./mailgun-mock-api
 
+# Lint Go and frontend code
+lint:
+    go vet ./...
+    cd web && npm run lint
+
 # Remove build artifacts
 clean:
     rm -rf mailgun-mock-api

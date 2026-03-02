@@ -20,5 +20,6 @@ All commands use `just`. Run `just` with no args to list available recipes.
 | Run Vite dev server with API proxy | `just dev-ui` |
 | Build (Vue SPA + Go binary) | `just build` |
 | Build and run | `just run` |
+| Lint (Go + frontend) | `just lint` |
 | Run Go tests | `go test ./...` |
 | Clean build artifacts | `just clean` |
