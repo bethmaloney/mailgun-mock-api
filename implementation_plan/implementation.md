@@ -119,12 +119,12 @@ Auth infrastructure for the rest of the API. Implements alongside or immediately
 - [x] `DELETE /v3/domains/{domain}/credentials/{login}` — delete
 
 ### API Keys
-- [ ] Model: `APIKey` with role, domain scope, active status, description
-- [ ] `GET /v3/keys` — list all keys
-- [ ] `POST /v3/keys` — create key (`key-` prefix + 48 hex chars, secret shown once)
-- [ ] `DELETE /v3/keys/{id}` — delete/deactivate
-- [ ] `POST /v3/keys/{id}/regenerate` — regenerate secret
-- [ ] `GET /v3/keys/public` — get public verification key
+- [x] Model: `APIKey` with role, domain scope, active status, description
+- [x] `GET /v3/keys` — list all keys
+- [x] `POST /v3/keys` — create key (`key-` prefix + 48 hex chars, secret shown once)
+- [x] `DELETE /v3/keys/{id}` — delete/deactivate
+- [x] `POST /v3/keys/{id}/regenerate` — regenerate secret
+- [x] `GET /v3/keys/public` — get public verification key
 
 ### IP Allowlist (stub)
 - [ ] `GET /v2/ip_whitelist` — list

@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net/http"
 
+	"github.com/bethmaloney/mailgun-mock-api/internal/apikey"
 	"github.com/bethmaloney/mailgun-mock-api/internal/credential"
 	"github.com/bethmaloney/mailgun-mock-api/internal/domain"
 	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
@@ -32,7 +33,7 @@ func New(db *gorm.DB) http.Handler {
 	}))
 
 	// Run domain model migrations.
-	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{})
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -42,6 +43,9 @@ func New(db *gorm.DB) http.Handler {
 
 	// Credential API handlers
 	ch := credential.NewHandlers(db)
+
+	// API Key handlers
+	kh := apikey.NewHandlers(db)
 
 	r.Route("/v4/domains", func(r chi.Router) {
 		r.Use(appMiddleware.BasicAuth(h.Config()))
@@ -70,6 +74,16 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/{name}/credentials", ch.DeleteAllCredentials)
 		r.Put("/{name}/credentials/{spec}", ch.UpdateCredential)
 		r.Delete("/{name}/credentials/{spec}", ch.DeleteCredential)
+	})
+
+	// API Key routes
+	r.Route("/v1/keys", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", kh.ListKeys)
+		r.Post("/", kh.CreateKey)
+		r.Get("/public", kh.GetPublicKey)
+		r.Delete("/{id}", kh.DeleteKey)
+		r.Post("/{id}/regenerate", kh.RegenerateKey)
 	})
 
 	// Mailgun API routes (placeholder)
