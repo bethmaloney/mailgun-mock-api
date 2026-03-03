@@ -13,6 +13,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/ip"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mailinglist"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
+	"github.com/bethmaloney/mailgun-mock-api/internal/metrics"
 	"github.com/bethmaloney/mailgun-mock-api/internal/route"
 	"github.com/bethmaloney/mailgun-mock-api/internal/subaccount"
 	"github.com/bethmaloney/mailgun-mock-api/internal/suppression"
@@ -99,6 +100,14 @@ func New(db *gorm.DB) http.Handler {
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
 	mh.SetEventHandlers(eh)
+
+	// Metrics handlers
+	mtrH := metrics.NewHandlers(db)
+
+	// Account-level stats (v3) — register before wildcard {domain_name} routes
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/stats/total", mtrH.GetAccountStats)
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/stats/filter", mtrH.GetFilteredStats)
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/stats/total/domains", mtrH.GetDomainStatsSnapshot)
 
 	r.Route("/v4/domains", func(r chi.Router) {
 		r.Use(appMiddleware.BasicAuth(h.Config()))
@@ -299,6 +308,11 @@ func New(db *gorm.DB) http.Handler {
 	// Domain-level stats
 	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/stats/total", tgh.GetDomainStats)
 
+	// Domain aggregate stubs (v3)
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/aggregates/providers", mtrH.GetDomainAggregateProviders)
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/aggregates/devices", mtrH.GetDomainAggregateDevices)
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/aggregates/countries", mtrH.GetDomainAggregateCountries)
+
 	// Tag limits route (different path pattern)
 	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/domains/{domain_name}/limits/tag", tgh.GetTagLimits)
 
@@ -310,6 +324,13 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/", tgh.V1DeleteTag)
 		r.Get("/limits", tgh.V1GetTagLimits)
 	})
+
+	// v1 analytics metrics
+	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v1/analytics/metrics", mtrH.QueryMetrics)
+	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v1/analytics/usage/metrics", mtrH.QueryUsageMetrics)
+
+	// v2 bounce classification
+	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v2/bounce-classification/metrics", mtrH.QueryBounceClassification)
 
 	// Mailing list routes
 	r.Route("/v3/lists", func(r chi.Router) {

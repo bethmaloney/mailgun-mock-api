@@ -19,7 +19,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 10 | Routes | done | CRUD, expression parser, inbound simulation |
 | 11 | IPs & IP Pools | done | Stub — static IPs, pool CRUD |
 | 12 | Subaccounts | done | CRUD, limits, feature flags, isolation |
-| 13 | Metrics & Analytics | pending | v3 stats, v1 metrics, usage, bounce classification |
+| 13 | Metrics & Analytics | done | v3 stats, v1 metrics, usage, bounce classification |
 | 14 | Web UI — Foundation | pending | Shell, routing, dashboard |
 | 15 | Web UI — Messages & Events | pending | Message/event list and detail views |
 | 16 | Web UI — Management | pending | Domains, suppressions, templates, lists, webhooks, routes |
@@ -467,27 +467,27 @@ Aggregate statistics derived from stored events.
 > Plan doc: [metrics-and-analytics.md](./metrics-and-analytics.md)
 
 ### Legacy v3 Stats
-- [ ] `GET /v3/stats/total` — account-level stats
-- [ ] `GET /v3/stats/filter` — filtered account stats
-- [ ] `GET /v3/stats/total/domains` — per-domain breakdown
+- [x] `GET /v3/stats/total` — account-level stats
+- [x] `GET /v3/stats/filter` — filtered account stats
+- [x] `GET /v3/stats/total/domains` — per-domain breakdown
 
 ### v1 Metrics API
-- [ ] `POST /v1/analytics/metrics` — multi-dimensional query (dimensions: time, domain, tag, subaccount, etc.)
-- [ ] Support up to 3 dimensions, 10 metrics per query
-- [ ] Pagination with `cursor` and configurable `limit` (defaults differ by dimension)
-- [ ] `include_aggregates` flag for rollup totals
-- [ ] Rate metrics computed as strings (e.g., `"98.5%"`)
+- [x] `POST /v1/analytics/metrics` — multi-dimensional query (dimensions: time, domain, tag, subaccount, etc.)
+- [x] Support up to 3 dimensions, 10 metrics per query
+- [x] Pagination with `cursor` and configurable `limit` (defaults differ by dimension)
+- [x] `include_aggregates` flag for rollup totals
+- [x] Rate metrics computed as strings (e.g., `"98.5%"`)
 
 ### Usage Metrics
-- [ ] `POST /v1/analytics/usage/metrics` — usage data (messages sent, stored, etc.)
+- [x] `POST /v1/analytics/usage/metrics` — usage data (messages sent, stored, etc.)
 
 ### Bounce Classification (stub)
-- [ ] `POST /v2/bounce-classification/metrics` — bounce breakdown by classification
+- [x] `POST /v2/bounce-classification/metrics` — bounce breakdown by classification
 
 ### Domain Aggregates
-- [ ] `GET /v3/domains/{domain}/stats/aggregates/providers` — per-provider breakdown
-- [ ] `GET /v3/domains/{domain}/stats/aggregates/devices` — per-device breakdown
-- [ ] `GET /v3/domains/{domain}/stats/aggregates/countries` — per-country breakdown
+- [x] `GET /v3/domains/{domain}/stats/aggregates/providers` — per-provider breakdown
+- [x] `GET /v3/domains/{domain}/stats/aggregates/devices` — per-device breakdown
+- [x] `GET /v3/domains/{domain}/stats/aggregates/countries` — per-country breakdown
 
 ---
 
