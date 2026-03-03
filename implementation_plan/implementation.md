@@ -14,7 +14,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 5 | Suppressions | in progress | Bounces, complaints, unsubscribes, allowlist |
 | 6 | Templates | in progress | CRUD, versioning, Handlebars rendering |
 | 7 | Tags & Stats | in progress | Auto-creation, time-series stats, v1 stubs |
-| 8 | Mailing Lists | pending | List/member CRUD, bulk ops, send integration |
+| 8 | Mailing Lists | in progress | List/member CRUD, bulk ops, send integration |
 | 9 | Webhooks | pending | v3/v4/v1 APIs, delivery pipeline, signing |
 | 10 | Routes | pending | CRUD, expression parser, inbound simulation |
 | 11 | IPs & IP Pools | pending | Stub — static IPs, pool CRUD |
@@ -309,26 +309,26 @@ List and member CRUD with bulk operations.
 > Plan doc: [mailing-lists.md](./mailing-lists.md)
 
 ### List CRUD
-- [ ] Model: `MailingList` (address, name, description, access_level, reply_preference, members_count, created_at)
-- [ ] `GET /v3/lists/pages` — list with cursor-based pagination
-- [ ] `GET /v3/lists/{address}` — get single
-- [ ] `POST /v3/lists` — create
-- [ ] `PUT /v3/lists/{address}` — update
-- [ ] `DELETE /v3/lists/{address}` — delete
+- [x] Model: `MailingList` (address, name, description, access_level, reply_preference, members_count, created_at)
+- [x] `GET /v3/lists/pages` — list with cursor-based pagination
+- [x] `GET /v3/lists/{address}` — get single
+- [x] `POST /v3/lists` — create
+- [x] `PUT /v3/lists/{address}` — update
+- [x] `DELETE /v3/lists/{address}` — delete
 
 ### Member CRUD
-- [ ] Model: `MailingListMember` (address, name, vars JSON, subscribed, list_address)
-- [ ] `GET /v3/lists/{address}/members/pages` — list with cursor pagination
-- [ ] `GET /v3/lists/{address}/members` — list with offset pagination (skip/limit)
-- [ ] `GET /v3/lists/{address}/members/{member_address}` — get single
-- [ ] `POST /v3/lists/{address}/members` — add single member
-- [ ] `PUT /v3/lists/{address}/members/{member_address}` — update
-- [ ] `DELETE /v3/lists/{address}/members/{member_address}` — delete
+- [x] Model: `MailingListMember` (address, name, vars JSON, subscribed, list_address)
+- [x] `GET /v3/lists/{address}/members/pages` — list with cursor pagination
+- [x] `GET /v3/lists/{address}/members` — list with offset pagination (skip/limit)
+- [x] `GET /v3/lists/{address}/members/{member_address}` — get single
+- [x] `POST /v3/lists/{address}/members` — add single member
+- [x] `PUT /v3/lists/{address}/members/{member_address}` — update
+- [x] `DELETE /v3/lists/{address}/members/{member_address}` — delete
 
 ### Bulk Operations
-- [ ] `POST /v3/lists/{address}/members.json` — bulk add/upsert via JSON array
+- [x] `POST /v3/lists/{address}/members.json` — bulk add/upsert via JSON array
 - [ ] `POST /v3/lists/{address}/members/import` — CSV import
-- [ ] Track `members_count` on list model (increment/decrement on member changes)
+- [x] Track `members_count` on list model (increment/decrement on member changes)
 
 ### List Sending Integration
 - [ ] Expand list address to members on message send

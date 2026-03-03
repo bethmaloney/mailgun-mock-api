@@ -10,6 +10,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/credential"
 	"github.com/bethmaloney/mailgun-mock-api/internal/domain"
 	"github.com/bethmaloney/mailgun-mock-api/internal/event"
+	"github.com/bethmaloney/mailgun-mock-api/internal/mailinglist"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
 	"github.com/bethmaloney/mailgun-mock-api/internal/suppression"
 	"github.com/bethmaloney/mailgun-mock-api/internal/tag"
@@ -42,7 +43,8 @@ func New(db *gorm.DB) http.Handler {
 	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &event.Event{},
 		&suppression.Bounce{}, &suppression.Complaint{}, &suppression.Unsubscribe{}, &suppression.AllowlistEntry{},
 		&template.Template{}, &template.TemplateVersion{},
-		&tag.Tag{})
+		&tag.Tag{},
+		&mailinglist.MailingList{}, &mailinglist.MailingListMember{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -70,6 +72,9 @@ func New(db *gorm.DB) http.Handler {
 
 	// Tag handlers
 	tgh := tag.NewHandlers(db)
+
+	// Mailing list handlers
+	mlh := mailinglist.NewHandlers(db)
 
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
@@ -205,6 +210,24 @@ func New(db *gorm.DB) http.Handler {
 
 	// Tag limits route (different path pattern)
 	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/domains/{domain_name}/limits/tag", tgh.GetTagLimits)
+
+	// Mailing list routes
+	r.Route("/v3/lists", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Post("/", mlh.CreateList)
+		r.Get("/", mlh.ListListsLegacy)
+		r.Get("/pages", mlh.ListLists)
+		r.Get("/{list_address}", mlh.GetList)
+		r.Put("/{list_address}", mlh.UpdateList)
+		r.Delete("/{list_address}", mlh.DeleteList)
+		r.Post("/{list_address}/members", mlh.AddMember)
+		r.Get("/{list_address}/members", mlh.ListMembersLegacy)
+		r.Get("/{list_address}/members/pages", mlh.ListMembers)
+		r.Get("/{list_address}/members/{member_address}", mlh.GetMember)
+		r.Put("/{list_address}/members/{member_address}", mlh.UpdateMember)
+		r.Delete("/{list_address}/members/{member_address}", mlh.DeleteMember)
+		r.Post("/{list_address}/members.json", mlh.BulkAddMembers)
+	})
 
 	// API Key routes
 	r.Route("/v1/keys", func(r chi.Router) {
