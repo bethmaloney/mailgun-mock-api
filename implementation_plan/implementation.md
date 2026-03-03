@@ -22,7 +22,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 13 | Metrics & Analytics | done | v3 stats, v1 metrics, usage, bounce classification |
 | 14 | Web UI — Foundation | done | Shell, routing, dashboard |
 | 15 | Web UI — Messages & Events | done | Message/event list and detail views |
-| 16 | Web UI — Management | pending | Domains, suppressions, templates, lists, webhooks, routes |
+| 16 | Web UI — Management | done | Domains, suppressions, templates, lists, webhooks, routes |
 | 17 | Web UI — Testing & Real-time | pending | Event triggers, inbound sim, config, WebSocket |
 
 ---
@@ -527,28 +527,28 @@ Aggregate statistics derived from stored events.
 ## Phase 16: Web UI — Management Pages
 
 ### Domains Page
-- [ ] Domain list with status badges (active/unverified/disabled)
-- [ ] Domain detail: DNS records, tracking settings, connection settings
+- [x] Domain list with status badges (active/unverified/disabled)
+- [x] Domain detail: DNS records, tracking settings, connection settings
 
 ### Suppressions Page
-- [ ] Tabbed view: Bounces, Complaints, Unsubscribes, Allowlist
-- [ ] Add/delete/import operations per suppression type
+- [x] Tabbed view: Bounces, Complaints, Unsubscribes, Allowlist
+- [x] Add/delete/import operations per suppression type
 
 ### Templates Page
-- [ ] Template list with version counts
-- [ ] Template detail: version list, version content preview, active version indicator
+- [x] Template list with version counts
+- [x] Template detail: version list, version content preview, active version indicator
 
 ### Mailing Lists Page
-- [ ] List of mailing lists with member counts
-- [ ] Member management: add, edit, remove, bulk import
+- [x] List of mailing lists with member counts
+- [x] Member management: add, edit, remove, bulk import
 
 ### Webhooks Page
-- [ ] Webhook configuration: registered URLs per event type
-- [ ] Delivery log: recent delivery attempts with status codes
+- [x] Webhook configuration: registered URLs per event type
+- [x] Delivery log: recent delivery attempts with status codes
 
 ### Routes Page
-- [ ] Route list sorted by priority
-- [ ] Route detail: expression, actions, created date
+- [x] Route list sorted by priority
+- [x] Route detail: expression, actions, created date
 
 ---
 
