@@ -192,7 +192,16 @@ func New(db *gorm.DB) http.Handler {
 		r.Get("/{tag}", tgh.GetTag)
 		r.Put("/{tag}", tgh.UpdateTag)
 		r.Delete("/{tag}", tgh.DeleteTag)
+
+		// Tag stats routes
+		r.Get("/{tag}/stats", tgh.GetTagStats)
+		r.Get("/{tag}/stats/aggregates/countries", tgh.GetTagStatsCountries)
+		r.Get("/{tag}/stats/aggregates/providers", tgh.GetTagStatsProviders)
+		r.Get("/{tag}/stats/aggregates/devices", tgh.GetTagStatsDevices)
 	})
+
+	// Domain-level stats
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/stats/total", tgh.GetDomainStats)
 
 	// Tag limits route (different path pattern)
 	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/domains/{domain_name}/limits/tag", tgh.GetTagLimits)

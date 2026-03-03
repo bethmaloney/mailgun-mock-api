@@ -281,15 +281,15 @@ Auto-created labels on messages with time-series statistics.
 - [x] `DELETE /v3/{domain}/tags/{tag}` — delete (detaches from events, doesn't delete events)
 
 ### Tag Statistics
-- [ ] `GET /v3/{domain}/tags/{tag}/stats` — time-series stats bucketed by `resolution` (hour/day/month)
-- [ ] `GET /v3/{domain}/tags/{tag}/stats/aggregates/countries` — aggregate by country
-- [ ] `GET /v3/{domain}/tags/{tag}/stats/aggregates/providers` — aggregate by provider
-- [ ] `GET /v3/{domain}/tags/{tag}/stats/aggregates/devices` — aggregate by device
+- [x] `GET /v3/{domain}/tags/{tag}/stats` — time-series stats bucketed by `resolution` (hour/day/month)
+- [x] `GET /v3/{domain}/tags/{tag}/stats/aggregates/countries` — aggregate by country
+- [x] `GET /v3/{domain}/tags/{tag}/stats/aggregates/providers` — aggregate by provider
+- [x] `GET /v3/{domain}/tags/{tag}/stats/aggregates/devices` — aggregate by device
 - [x] `GET /v3/domains/{domain}/limits/tag` — tag count and limit
 
 ### Domain-level Stats
-- [ ] `GET /v3/{domain}/stats/total` — domain-level time-series stats (shared computation with tag stats)
-- [ ] Support `event` param as repeatable query parameter
+- [x] `GET /v3/{domain}/stats/total` — domain-level time-series stats (shared computation with tag stats)
+- [x] Support `event` param as repeatable query parameter
 
 ### Path Discrepancy Handling
 - [ ] Support both `/v3/{domain}/tags/{tag}` (SDK) and `/v3/{domain}/tag?tag=...` (OpenAPI) paths
