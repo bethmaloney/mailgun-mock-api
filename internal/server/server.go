@@ -111,6 +111,7 @@ func New(db *gorm.DB) http.Handler {
 
 	r.Route("/v4/domains", func(r chi.Router) {
 		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.SubaccountScoping(db))
 		r.Post("/", dh.CreateDomain)
 		r.Get("/", dh.ListDomains)
 		r.Get("/{name}", dh.GetDomain)

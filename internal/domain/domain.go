@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bethmaloney/mailgun-mock-api/internal/database"
+	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/bethmaloney/mailgun-mock-api/internal/pagination"
 	"github.com/bethmaloney/mailgun-mock-api/internal/request"
@@ -419,6 +420,11 @@ func (h *Handlers) CreateDomain(w http.ResponseWriter, r *http.Request) {
 		TrackingUnsubscribeTextFooter: "\n\nTo unsubscribe click: <%unsubscribe_url%>\n\n",
 	}
 
+	// Set subaccount_id from context if present
+	if saID := appMiddleware.SubaccountFromContext(r.Context()); saID != "" {
+		d.SubaccountID = &saID
+	}
+
 	err := h.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&d).Error; err != nil {
 			return err
@@ -450,6 +456,17 @@ func (h *Handlers) ListDomains(w http.ResponseWriter, r *http.Request) {
 	params := pagination.ParseSkipLimitParams(r, 100, 1000)
 
 	query := h.db.Model(&Domain{})
+
+	// Subaccount scoping
+	includeSubaccounts := r.URL.Query().Get("include_subaccounts") == "true"
+	saID := appMiddleware.SubaccountFromContext(r.Context())
+	if !includeSubaccounts {
+		if saID != "" {
+			query = query.Where("subaccount_id = ?", saID)
+		} else {
+			query = query.Where("subaccount_id IS NULL OR subaccount_id = ''")
+		}
+	}
 
 	// Filter by state
 	if state := r.URL.Query().Get("state"); state != "" {

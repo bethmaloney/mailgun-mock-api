@@ -15,6 +15,56 @@ import (
 type contextKey string
 
 const domainContextKey contextKey = "domain"
+const subaccountContextKey contextKey = "subaccount"
+
+// SubaccountFromContext returns the subaccount ID stored in the request context
+// by the SubaccountScoping middleware, or an empty string if not set.
+func SubaccountFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(subaccountContextKey).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// subaccountLookup is a minimal struct used to query the subaccounts table without
+// importing the subaccount package (which would create a circular dependency).
+type subaccountLookup struct {
+	SubaccountID string
+	Status       string
+}
+
+func (subaccountLookup) TableName() string { return "subaccounts" }
+
+// SubaccountScoping returns a chi-compatible middleware that extracts the
+// X-Mailgun-On-Behalf-Of header from the request. If the header is present,
+// the middleware validates the subaccount exists and is not disabled, then
+// stores the subaccount ID in the request context. If absent, the request
+// proceeds with no subaccount context.
+func SubaccountScoping(db *gorm.DB) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			saHeader := r.Header.Get("X-Mailgun-On-Behalf-Of")
+			if saHeader == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			var sa subaccountLookup
+			if err := db.Where("subaccount_id = ?", saHeader).First(&sa).Error; err != nil {
+				response.RespondError(w, http.StatusBadRequest, "Invalid subaccount")
+				return
+			}
+
+			if sa.Status == "disabled" {
+				response.RespondError(w, http.StatusForbidden, "Subaccount is disabled")
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), subaccountContextKey, sa.SubaccountID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
 
 // DomainFromContext returns the domain name stored in the request context
 // by the RequireDomain middleware, or an empty string if not set.

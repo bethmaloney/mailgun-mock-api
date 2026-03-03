@@ -6,7 +6,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 
 | Phase | Area | Status | Notes |
 |-------|------|--------|-------|
-| 0 | Foundation & Cross-cutting | in progress | Auth, pagination, config, response formatting |
+| 0 | Foundation & Cross-cutting | done | Auth, pagination, config, response formatting, subaccount scoping |
 | 1 | Domains | done | CRUD, verification, tracking, connection settings |
 | 2 | Credentials & Keys | done | SMTP creds, API keys, IP allowlist |
 | 3 | Messages & Storage | done | Send, store, retrieve, resend |
@@ -34,7 +34,7 @@ Shared infrastructure referenced by every feature area. Must be complete before 
 ### Database & Models
 - [x] Define GORM base model with common fields (ID, timestamps) and consistent primary key strategy
 - [x] Set up migration framework — auto-migrate all models on startup
-- [ ] Add seed data support (e.g., default IPs for IP Pools, see [ips-and-pools.md](./ips-and-pools.md))
+- [x] Add seed data support (e.g., default IPs for IP Pools, see [ips-and-pools.md](./ips-and-pools.md))
 
 ### Authentication Middleware
 - [x] Implement HTTP Basic Auth middleware (`username: "api"`, `password: <key>`) — see [credentials-and-keys.md](./credentials-and-keys.md)
@@ -58,9 +58,9 @@ Shared infrastructure referenced by every feature area. Must be complete before 
 - [x] Handle `application/x-www-form-urlencoded` for credential/key endpoints
 
 ### Subaccount Scoping (cross-cutting)
-- [ ] Middleware to extract `X-Mailgun-On-Behalf-Of` header and set subaccount context on request — see [subaccounts.md](./subaccounts.md)
-- [ ] All resource models include optional `subaccount_id` field for soft isolation
-- [ ] List endpoints filter by subaccount context; `include_subaccounts` param bypasses filter
+- [x] Middleware to extract `X-Mailgun-On-Behalf-Of` header and set subaccount context on request — see [subaccounts.md](./subaccounts.md)
+- [x] All resource models include optional `subaccount_id` field for soft isolation
+- [x] List endpoints filter by subaccount context; `include_subaccounts` param bypasses filter
 
 ### Mock Utility Endpoints
 - [x] `POST /mock/reset` — clear all data
