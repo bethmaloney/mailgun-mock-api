@@ -20,6 +20,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/tag"
 	"github.com/bethmaloney/mailgun-mock-api/internal/template"
 	"github.com/bethmaloney/mailgun-mock-api/internal/webhook"
+	ws "github.com/bethmaloney/mailgun-mock-api/internal/websocket"
 	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
@@ -54,6 +55,10 @@ func New(db *gorm.DB) http.Handler {
 		&route.Route{},
 		&ip.IP{}, &ip.IPPool{}, &ip.IPPoolIP{}, &ip.DomainIP{}, &ip.DomainPool{},
 		&subaccount.Subaccount{}, &subaccount.SendingLimit{})
+
+	// WebSocket hub
+	hub := ws.NewHub()
+	go hub.Run()
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -399,6 +404,7 @@ func New(db *gorm.DB) http.Handler {
 	r.Route("/api/v3", func(r chi.Router) {
 	})
 	r.Route("/mock", func(r chi.Router) {
+		r.Get("/ws", hub.HandleWebSocket)
 		r.Get("/health", mock.HealthHandler)
 		r.Get("/config", h.GetConfig)
 		r.Put("/config", h.UpdateConfig)

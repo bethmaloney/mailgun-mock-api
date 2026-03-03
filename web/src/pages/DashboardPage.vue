@@ -4,6 +4,7 @@ import { api } from "@/api/client";
 import StatusBadge from "@/components/StatusBadge.vue";
 import DataTable from "@/components/DataTable.vue";
 import type { Column } from "@/components/DataTable.vue";
+import { useWebSocket } from "@/composables/useWebSocket";
 
 interface WebhookDelivery {
   url: string;
@@ -56,7 +57,9 @@ function deliveryRows(deliveries: WebhookDelivery[]): Record<string, unknown>[] 
   }));
 }
 
-onMounted(async () => {
+async function fetchDashboard() {
+  loading.value = true;
+  error.value = null;
   try {
     data.value = await api.get<DashboardData>("/mock/dashboard");
   } catch (e: unknown) {
@@ -65,7 +68,17 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+}
+
+const { onMessage } = useWebSocket();
+
+onMessage((msg) => {
+  if (msg.type === "message.new" || msg.type === "event.new" || msg.type === "data.reset") {
+    fetchDashboard();
+  }
 });
+
+onMounted(() => fetchDashboard());
 </script>
 
 <template>

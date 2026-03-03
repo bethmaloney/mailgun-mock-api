@@ -5,6 +5,7 @@ import StatusBadge from "@/components/StatusBadge.vue";
 import DataTable from "@/components/DataTable.vue";
 import Pagination from "@/components/Pagination.vue";
 import type { Column } from "@/components/DataTable.vue";
+import { useWebSocket } from "@/composables/useWebSocket";
 
 interface Domain {
   name: string;
@@ -186,6 +187,14 @@ function getExpandedEvent(): EventItem | null {
   if (!expandedEventId.value) return null;
   return events.value.find((ev) => ev.id === expandedEventId.value) || null;
 }
+
+const { onMessage } = useWebSocket();
+
+onMessage((msg) => {
+  if (msg.type === "event.new") {
+    fetchEvents();
+  }
+});
 
 onMounted(() => fetchDomains());
 </script>

@@ -5,6 +5,7 @@ import StatusBadge from "@/components/StatusBadge.vue";
 import DataTable from "@/components/DataTable.vue";
 import Pagination from "@/components/Pagination.vue";
 import type { Column } from "@/components/DataTable.vue";
+import { useWebSocket } from "@/composables/useWebSocket";
 
 interface MessageListItem {
   id: string;
@@ -222,6 +223,14 @@ async function clearAll() {
     error.value = err.message || "Failed to clear messages";
   }
 }
+
+const { onMessage } = useWebSocket();
+
+onMessage((msg) => {
+  if (msg.type === "message.new") {
+    fetchMessages();
+  }
+});
 
 onMounted(() => fetchMessages());
 </script>

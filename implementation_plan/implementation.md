@@ -23,7 +23,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 14 | Web UI — Foundation | done | Shell, routing, dashboard |
 | 15 | Web UI — Messages & Events | done | Message/event list and detail views |
 | 16 | Web UI — Management | done | Domains, suppressions, templates, lists, webhooks, routes |
-| 17 | Web UI — Testing & Real-time | pending | Event triggers, inbound sim, config, WebSocket |
+| 17 | Web UI — Testing & Real-time | done | Event triggers, inbound sim, config, WebSocket |
 
 ---
 
@@ -555,17 +555,17 @@ Aggregate statistics derived from stored events.
 ## Phase 17: Web UI — Testing & Real-time
 
 ### Testing Tools
-- [ ] Event trigger panel: select message → trigger deliver/fail/open/click/unsubscribe/complaint
-- [ ] Inbound simulation form: compose mock inbound email, submit to `/mock/inbound/{domain}`
+- [x] Event trigger panel: select message → trigger deliver/fail/open/click/unsubscribe/complaint
+- [x] Inbound simulation form: compose mock inbound email, submit to `/mock/inbound/{domain}`
 
 ### Mock Configuration Page
-- [ ] Settings form for all mock config options (auto-delivery mode, verification mode, webhook retry, auth mode)
-- [ ] Data reset buttons (reset all, reset messages, reset per-domain)
+- [x] Settings form for all mock config options (auto-delivery mode, verification mode, webhook retry, auth mode)
+- [x] Data reset buttons (reset all, reset messages, reset per-domain)
 
 ### Real-time Updates
-- [ ] `GET /mock/ws` — WebSocket endpoint broadcasting events, messages, webhook deliveries
-- [ ] Connect WebSocket in Vue app; auto-update message list, event log, webhook delivery log
-- [ ] Connection status indicator in UI
+- [x] `GET /mock/ws` — WebSocket endpoint broadcasting events, messages, webhook deliveries
+- [x] Connect WebSocket in Vue app; auto-update message list, event log, webhook delivery log
+- [x] Connection status indicator in UI
 
 ---
 

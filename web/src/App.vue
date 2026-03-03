@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import ToastNotification from "@/components/ToastNotification.vue";
+import { useWebSocket } from "@/composables/useWebSocket";
+
+const { connected } = useWebSocket();
 </script>
 
 <template>
@@ -9,6 +12,13 @@ import ToastNotification from "@/components/ToastNotification.vue";
         <h1 class="sidebar-brand">
           Mailgun Mock
         </h1>
+        <div
+          class="connection-status"
+          :class="{ 'is-connected': connected }"
+        >
+          <span class="status-dot" />
+          <span class="status-text">{{ connected ? 'Connected' : 'Disconnected' }}</span>
+        </div>
       </div>
       <nav class="sidebar-nav">
         <router-link
@@ -259,5 +269,32 @@ body {
 
 .page p {
   color: var(--color-text-secondary);
+}
+
+/* -------------------------------------------------------
+   WebSocket connection status indicator
+   ------------------------------------------------------- */
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding-top: 0.5rem;
+}
+
+.status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+}
+
+.connection-status.is-connected .status-dot {
+  background: #22c55e;
+}
+
+.status-text {
+  font-size: 0.6875rem;
+  color: var(--sidebar-section-text);
 }
 </style>
