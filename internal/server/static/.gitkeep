@@ -1,0 +1,2 @@
+# This directory holds the built Vue SPA files.
+# It's populated during the build process by `just build`.
