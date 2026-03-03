@@ -10,6 +10,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/credential"
 	"github.com/bethmaloney/mailgun-mock-api/internal/domain"
 	"github.com/bethmaloney/mailgun-mock-api/internal/event"
+	"github.com/bethmaloney/mailgun-mock-api/internal/ip"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mailinglist"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
 	"github.com/bethmaloney/mailgun-mock-api/internal/route"
@@ -35,7 +36,7 @@ func New(db *gorm.DB) http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -48,7 +49,8 @@ func New(db *gorm.DB) http.Handler {
 		&tag.Tag{},
 		&mailinglist.MailingList{}, &mailinglist.MailingListMember{},
 		&webhook.DomainWebhook{}, &webhook.AccountWebhook{}, &webhook.WebhookDelivery{},
-		&route.Route{})
+		&route.Route{},
+		&ip.IP{}, &ip.IPPool{}, &ip.IPPoolIP{}, &ip.DomainIP{}, &ip.DomainPool{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -86,6 +88,9 @@ func New(db *gorm.DB) http.Handler {
 	// Route handlers
 	rth := route.NewHandlers(db)
 
+	// IP handlers
+	iph := ip.NewHandlers(db)
+
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
 	mh.SetEventHandlers(eh)
@@ -121,6 +126,11 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/{name}/credentials", ch.DeleteAllCredentials)
 		r.Put("/{name}/credentials/{spec}", ch.UpdateCredential)
 		r.Delete("/{name}/credentials/{spec}", ch.DeleteCredential)
+
+		// Domain IP routes
+		r.Get("/{name}/ips", iph.ListDomainIPs)
+		r.Post("/{name}/ips", iph.AssignDomainIP)
+		r.Delete("/{name}/ips/{ip}", iph.UnassignDomainIP)
 	})
 
 	// v3 domain webhook routes
@@ -317,6 +327,30 @@ func New(db *gorm.DB) http.Handler {
 		r.Post("/", ah.AddEntry)
 		r.Put("/", ah.UpdateEntry)
 		r.Delete("/", ah.DeleteEntry)
+	})
+
+	// IP routes (account-level)
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/ips", iph.ListIPs)
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/ips/{ip}", iph.GetIP)
+
+	// IP Pool routes (v1 prefix)
+	r.Route("/v1/ip_pools", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", iph.ListPools)
+		r.Post("/", iph.CreatePool)
+		r.Get("/{pool_id}", iph.GetPool)
+		r.Patch("/{pool_id}", iph.UpdatePool)
+		r.Delete("/{pool_id}", iph.DeletePool)
+	})
+
+	// IP Pool routes (v3 prefix -- same handlers)
+	r.Route("/v3/ip_pools", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", iph.ListPools)
+		r.Post("/", iph.CreatePool)
+		r.Get("/{pool_id}", iph.GetPool)
+		r.Patch("/{pool_id}", iph.UpdatePool)
+		r.Delete("/{pool_id}", iph.DeletePool)
 	})
 
 	// Mailgun API routes (placeholder)

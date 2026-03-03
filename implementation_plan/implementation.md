@@ -17,7 +17,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 8 | Mailing Lists | done | List/member CRUD, bulk ops, send integration |
 | 9 | Webhooks | done | v3/v4/v1 APIs, delivery pipeline, signing |
 | 10 | Routes | done | CRUD, expression parser, inbound simulation |
-| 11 | IPs & IP Pools | pending | Stub — static IPs, pool CRUD |
+| 11 | IPs & IP Pools | done | Stub — static IPs, pool CRUD |
 | 12 | Subaccounts | pending | CRUD, limits, feature flags, isolation |
 | 13 | Metrics & Analytics | pending | v3 stats, v1 metrics, usage, bounce classification |
 | 14 | Web UI — Foundation | pending | Shell, routing, dashboard |
@@ -415,20 +415,20 @@ Static IP data and pool CRUD. Low complexity.
 > Plan doc: [ips-and-pools.md](./ips-and-pools.md)
 
 ### IP Management
-- [ ] Model: `IP` with pre-seeded default IPs
-- [ ] `GET /v3/ips` — list all IPs
-- [ ] `GET /v3/ips/{ip}` — get single IP
-- [ ] `GET /v3/domains/{name}/ips` — list IPs assigned to domain
-- [ ] `POST /v3/domains/{name}/ips` — assign IP to domain
-- [ ] `DELETE /v3/domains/{name}/ips/{ip}` — unassign IP (also handle `/v3/domains/{name}/pool/{ip}` path)
+- [x] Model: `IP` with pre-seeded default IPs
+- [x] `GET /v3/ips` — list all IPs
+- [x] `GET /v3/ips/{ip}` — get single IP
+- [x] `GET /v3/domains/{name}/ips` — list IPs assigned to domain
+- [x] `POST /v3/domains/{name}/ips` — assign IP to domain
+- [x] `DELETE /v3/domains/{name}/ips/{ip}` — unassign IP (also handle `/v3/domains/{name}/pool/{ip}` path)
 
 ### IP Pool CRUD
-- [ ] Model: `IPPool` (name, description, ips[])
-- [ ] `GET /v1/ip_pools` (also accept `/v3/ip_pools`) — list pools
-- [ ] `POST /v1/ip_pools` — create pool
-- [ ] `GET /v1/ip_pools/{pool_id}` — get pool
-- [ ] `PUT /v1/ip_pools/{pool_id}` — update pool
-- [ ] `DELETE /v1/ip_pools/{pool_id}` — delete pool (with `ip_pool` replacement param)
+- [x] Model: `IPPool` (name, description, ips[])
+- [x] `GET /v1/ip_pools` (also accept `/v3/ip_pools`) — list pools
+- [x] `POST /v1/ip_pools` — create pool
+- [x] `GET /v1/ip_pools/{pool_id}` — get pool
+- [x] `PUT /v1/ip_pools/{pool_id}` — update pool
+- [x] `DELETE /v1/ip_pools/{pool_id}` — delete pool (with `ip_pool` replacement param)
 
 ---
 
