@@ -90,12 +90,22 @@ func New(db *gorm.DB) http.Handler {
 		r.Post("/", mh.SendMessage)
 	})
 
-	// Message storage routes (retrieve / delete)
+	// MIME message sending route
+	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v3/{domain_name}/messages.mime", mh.SendMIMEMessage)
+
+	// Delete envelopes (purge queue) route
+	r.With(appMiddleware.BasicAuth(h.Config())).Delete("/v3/{domain_name}/envelopes", mh.DeleteEnvelopes)
+
+	// Message storage routes (retrieve / delete / resend)
 	r.Route("/v3/domains/{domain_name}/messages", func(r chi.Router) {
 		r.Use(appMiddleware.BasicAuth(h.Config()))
 		r.Get("/{storage_key}", mh.GetMessage)
 		r.Delete("/{storage_key}", mh.DeleteMessage)
+		r.Post("/{storage_key}", mh.ResendMessage)
 	})
+
+	// Sending queues route
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/domains/{domain_name}/sending_queues", mh.GetSendingQueues)
 
 	// API Key routes
 	r.Route("/v1/keys", func(r chi.Router) {

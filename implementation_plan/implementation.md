@@ -149,7 +149,7 @@ Core message acceptance pipeline. Generates events that feed into all downstream
 - [x] Return `{ "id": "<message-id>", "message": "Queued. Thank you." }`
 
 ### MIME Sending
-- [ ] `POST /v3/{domain}/messages.mime` — accept raw MIME with `to` override
+- [x] `POST /v3/{domain}/messages.mime` — accept raw MIME with `to` override
 
 ### Message Storage & Retrieval
 - [x] Generate storage keys (opaque format, e.g., `mock-<uuid>`)
@@ -158,11 +158,11 @@ Core message acceptance pipeline. Generates events that feed into all downstream
 - [ ] Store attachment bytes; serve via storage URL in message detail
 
 ### Message Resend
-- [ ] `POST /v3/domains/{domain}/messages/{storage_key}` — resend to new recipients
+- [x] `POST /v3/domains/{domain}/messages/{storage_key}` — resend to new recipients
 
 ### Sending Queues (stub)
-- [ ] `GET /v3/domains/{name}/sending_queues` — return queue status (always empty/idle)
-- [ ] `DELETE /v3/{domain}/envelopes` — purge queue (no-op)
+- [x] `GET /v3/domains/{name}/sending_queues` — return queue status (always empty/idle)
+- [x] `DELETE /v3/{domain}/envelopes` — purge queue (no-op)
 
 ---
 

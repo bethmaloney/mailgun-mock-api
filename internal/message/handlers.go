@@ -48,6 +48,8 @@ type StoredMessage struct {
 	RecipientVariables string  // JSON string
 	Options            string  // JSON object string (o: prefixed fields)
 	TestMode           bool
+	MIMEBody           string  // Raw MIME content for messages sent via messages.mime
+	Attachments        string  // JSON string describing attachment metadata
 }
 
 // Handlers holds the database connection and mock configuration for message endpoints.
@@ -289,6 +291,11 @@ func (h *Handlers) GetMessage(w http.ResponseWriter, r *http.Request) {
 		if len(options) > 0 {
 			resp["X-Mailgun-Options"] = msg.Options
 		}
+	}
+
+	// Add MIME body if present
+	if msg.MIMEBody != "" {
+		resp["mime-body"] = msg.MIMEBody
 	}
 
 	response.RespondJSON(w, http.StatusOK, resp)

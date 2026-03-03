@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -58,10 +59,14 @@ func setupRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
 	r.Route("/v3/{domain_name}/messages", func(r chi.Router) {
 		r.Post("/", mh.SendMessage)
 	})
+	r.Post("/v3/{domain_name}/messages.mime", mh.SendMIMEMessage)
 	r.Route("/v3/domains/{domain_name}/messages", func(r chi.Router) {
 		r.Get("/{storage_key}", mh.GetMessage)
 		r.Delete("/{storage_key}", mh.DeleteMessage)
+		r.Post("/{storage_key}", mh.ResendMessage)
 	})
+	r.Get("/v3/domains/{domain_name}/sending_queues", mh.GetSendingQueues)
+	r.Delete("/v3/{domain_name}/envelopes", mh.DeleteEnvelopes)
 	return r
 }
 
@@ -99,6 +104,35 @@ func newMultipartRequestWithRepeatedFields(t *testing.T, method, url string, fie
 		}
 	}
 	writer.Close()
+	req := httptest.NewRequest(method, url, &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req
+}
+
+// newMultipartRequestWithFile creates an HTTP request with multipart/form-data containing
+// a file upload part and optional extra form fields.
+func newMultipartRequestWithFile(t *testing.T, method, url string, fileFieldName, fileName string, fileContent []byte, fields map[string]string) *http.Request {
+	t.Helper()
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	// Write the file part first
+	filePart, err := writer.CreateFormFile(fileFieldName, fileName)
+	if err != nil {
+		t.Fatalf("failed to create form file %q: %v", fileFieldName, err)
+	}
+	if _, err := io.Copy(filePart, bytes.NewReader(fileContent)); err != nil {
+		t.Fatalf("failed to write file content: %v", err)
+	}
+
+	// Write extra form fields
+	for key, val := range fields {
+		if err := writer.WriteField(key, val); err != nil {
+			t.Fatalf("failed to write field %q: %v", key, err)
+		}
+	}
+	writer.Close()
+
 	req := httptest.NewRequest(method, url, &buf)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	return req
@@ -165,17 +199,67 @@ func deleteMessage(t *testing.T, router http.Handler, domainName, storageKey str
 }
 
 // extractStorageKey extracts the storage key from a send response message ID.
-// The storage key is typically derived from or related to the message ID.
-// In the mock, we expect the send response to include a storage key or the
-// message ID can be used to retrieve the message. We parse the ID to derive it.
 func extractStorageKey(t *testing.T, sendResp sendResponse) string {
 	t.Helper()
-	// The message ID is in angle brackets like <timestamp.random@domain>.
-	// Strip the angle brackets and use the inner part as the storage key.
 	id := sendResp.ID
 	id = strings.TrimPrefix(id, "<")
 	id = strings.TrimSuffix(id, ">")
 	return id
+}
+
+// sendMIMEMessage sends a MIME message via POST /v3/{domain}/messages.mime.
+func sendMIMEMessage(t *testing.T, router http.Handler, domainName, to string, mimeContent []byte, extraFields map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	url := fmt.Sprintf("/v3/%s/messages.mime", domainName)
+	fields := make(map[string]string)
+	fields["to"] = to
+	for k, v := range extraFields {
+		fields[k] = v
+	}
+	req := newMultipartRequestWithFile(t, http.MethodPost, url, "message", "message.mime", mimeContent, fields)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+// sendMIMEMessageNoFile sends a MIME request without the file part (for testing missing file).
+func sendMIMEMessageNoFile(t *testing.T, router http.Handler, domainName string, fields map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	url := fmt.Sprintf("/v3/%s/messages.mime", domainName)
+	req := newMultipartRequest(t, http.MethodPost, url, fields)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+// resendMessage resends a stored message via POST /v3/domains/{domain}/messages/{storage_key}.
+func resendMessage(t *testing.T, router http.Handler, domainName, storageKey string, fields map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	url := fmt.Sprintf("/v3/domains/%s/messages/%s", domainName, storageKey)
+	req := newMultipartRequest(t, http.MethodPost, url, fields)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+// getSendingQueues retrieves sending queue status via GET /v3/domains/{domain}/sending_queues.
+func getSendingQueues(t *testing.T, router http.Handler, domainName string) *httptest.ResponseRecorder {
+	t.Helper()
+	url := fmt.Sprintf("/v3/domains/%s/sending_queues", domainName)
+	req := httptest.NewRequest(http.MethodGet, url, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+// purgeQueue purges the sending queue via DELETE /v3/{domain}/envelopes.
+func purgeQueue(t *testing.T, router http.Handler, domainName string) *httptest.ResponseRecorder {
+	t.Helper()
+	url := fmt.Sprintf("/v3/%s/envelopes", domainName)
+	req := httptest.NewRequest(http.MethodDelete, url, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +287,25 @@ type messageDetailResponse struct {
 }
 
 type deleteMessageResponse struct {
+	Message string `json:"message"`
+}
+
+type queueDisabledInfo struct {
+	Until  string `json:"until"`
+	Reason string `json:"reason"`
+}
+
+type queueStatus struct {
+	IsDisabled bool              `json:"is_disabled"`
+	Disabled   queueDisabledInfo `json:"disabled"`
+}
+
+type sendingQueuesResponse struct {
+	Regular   queueStatus `json:"regular"`
+	Scheduled queueStatus `json:"scheduled"`
+}
+
+type purgeQueueResponse struct {
 	Message string `json:"message"`
 }
 
@@ -236,7 +339,6 @@ func TestSendMessage_BasicText(t *testing.T) {
 		if resp.ID == "" {
 			t.Error("expected non-empty message ID")
 		}
-		// ID should be in angle brackets like <...@domain>
 		if !strings.HasPrefix(resp.ID, "<") || !strings.HasSuffix(resp.ID, ">") {
 			t.Errorf("expected ID in angle brackets, got %q", resp.ID)
 		}
@@ -282,7 +384,6 @@ func TestSendMessage_HTMLBody(t *testing.T) {
 		}
 	})
 
-	// Retrieve the message and verify HTML is stored
 	t.Run("stored message contains HTML body", func(t *testing.T) {
 		storageKey := extractStorageKey(t, resp)
 		getRec := getMessage(t, router, "example.com", storageKey)
@@ -325,7 +426,6 @@ func TestSendMessage_MissingFrom(t *testing.T) {
 		if resp.Message == "" {
 			t.Error("expected non-empty error message")
 		}
-		// The error should mention the "from" parameter
 		if !strings.Contains(strings.ToLower(resp.Message), "from") {
 			t.Errorf("expected error message to mention 'from', got %q", resp.Message)
 		}
@@ -360,7 +460,6 @@ func TestSendMessage_MissingTo(t *testing.T) {
 		if resp.Message == "" {
 			t.Error("expected non-empty error message")
 		}
-		// The error should mention the "to" parameter
 		if !strings.Contains(strings.ToLower(resp.Message), "to") {
 			t.Errorf("expected error message to mention 'to', got %q", resp.Message)
 		}
@@ -432,14 +531,12 @@ func TestSendMessage_Tags(t *testing.T) {
 		}
 	})
 
-	// Retrieve and verify tags are stored
 	t.Run("stored message contains tags", func(t *testing.T) {
 		storageKey := extractStorageKey(t, resp)
 		getRec := getMessage(t, router, "example.com", storageKey)
 		if getRec.Code != http.StatusOK {
 			t.Fatalf("expected 200 on GET, got %d (body: %s)", getRec.Code, getRec.Body.String())
 		}
-		// Verify the response body contains the tag information
 		body := getRec.Body.String()
 		if !strings.Contains(body, "newsletter") {
 			t.Errorf("expected stored message to contain tag 'newsletter', body: %s", body)
@@ -484,7 +581,6 @@ func TestSendMessage_CustomHeadersAndVariables(t *testing.T) {
 		}
 	})
 
-	// Retrieve and verify custom headers/variables are stored
 	t.Run("stored message contains custom headers and variables", func(t *testing.T) {
 		storageKey := extractStorageKey(t, resp)
 		getRec := getMessage(t, router, "example.com", storageKey)
@@ -549,7 +645,6 @@ func TestSendMessage_InvalidDomain(t *testing.T) {
 	db := setupTestDB(t)
 	cfg := defaultConfig()
 	router := setupRouter(db, cfg)
-	// Do NOT create any domain
 
 	rec := sendMessage(t, router, "nonexistent.com", map[string]string{
 		"from":    "sender@nonexistent.com",
@@ -575,7 +670,6 @@ func TestRetrieveMessage(t *testing.T) {
 	router := setupRouter(db, cfg)
 	createTestDomain(t, router, "example.com")
 
-	// Send a message first
 	sendRec := sendMessage(t, router, "example.com", map[string]string{
 		"from":    "sender@example.com",
 		"to":      "recipient@example.com",
@@ -590,10 +684,8 @@ func TestRetrieveMessage(t *testing.T) {
 
 	var sendResp sendResponse
 	decodeJSON(t, sendRec, &sendResp)
-
 	storageKey := extractStorageKey(t, sendResp)
 
-	// Retrieve the message
 	getRec := getMessage(t, router, "example.com", storageKey)
 
 	t.Run("returns 200", func(t *testing.T) {
@@ -657,7 +749,6 @@ func TestRetrieveMessage(t *testing.T) {
 		if len(detail.MessageHeaders) == 0 {
 			t.Error("expected at least one message header pair")
 		}
-		// Each header should be a pair [name, value]
 		for _, header := range detail.MessageHeaders {
 			if len(header) != 2 {
 				t.Errorf("expected header pair of length 2, got %d: %v", len(header), header)
@@ -676,7 +767,6 @@ func TestDeleteMessage(t *testing.T) {
 	router := setupRouter(db, cfg)
 	createTestDomain(t, router, "example.com")
 
-	// Send a message
 	sendRec := sendMessage(t, router, "example.com", map[string]string{
 		"from":    "sender@example.com",
 		"to":      "recipient@example.com",
@@ -690,10 +780,8 @@ func TestDeleteMessage(t *testing.T) {
 
 	var sendResp sendResponse
 	decodeJSON(t, sendRec, &sendResp)
-
 	storageKey := extractStorageKey(t, sendResp)
 
-	// Delete the message
 	delRec := deleteMessage(t, router, "example.com", storageKey)
 
 	t.Run("delete returns 200", func(t *testing.T) {
@@ -710,7 +798,6 @@ func TestDeleteMessage(t *testing.T) {
 		}
 	})
 
-	// Verify the message is gone
 	t.Run("GET after DELETE returns 404", func(t *testing.T) {
 		getRec := getMessage(t, router, "example.com", storageKey)
 		if getRec.Code != http.StatusNotFound {
@@ -745,17 +832,12 @@ func TestSendMessage_MultipleRecipients(t *testing.T) {
 	var resp sendResponse
 	decodeJSON(t, rec, &resp)
 
-	// Retrieve and verify all recipients are stored
 	t.Run("stored message contains all recipients", func(t *testing.T) {
 		storageKey := extractStorageKey(t, resp)
 		getRec := getMessage(t, router, "example.com", storageKey)
 		if getRec.Code != http.StatusOK {
 			t.Fatalf("expected 200 on GET, got %d (body: %s)", getRec.Code, getRec.Body.String())
 		}
-		var detail messageDetailResponse
-		decodeJSON(t, getRec, &detail)
-
-		// The To or recipients field should contain all addresses
 		body := getRec.Body.String()
 		for _, addr := range []string{"alice@example.com", "bob@example.com", "charlie@example.com"} {
 			if !strings.Contains(body, addr) {
@@ -799,7 +881,6 @@ func TestSendMessage_CCAndBCC(t *testing.T) {
 		}
 	})
 
-	// Retrieve and verify CC/BCC are stored
 	t.Run("stored message contains cc", func(t *testing.T) {
 		storageKey := extractStorageKey(t, resp)
 		getRec := getMessage(t, router, "example.com", storageKey)
@@ -847,7 +928,6 @@ func TestSendMessage_RecipientVariables(t *testing.T) {
 		}
 	})
 
-	// Retrieve and verify recipient-variables are stored
 	t.Run("stored message contains recipient-variables", func(t *testing.T) {
 		storageKey := extractStorageKey(t, resp)
 		getRec := getMessage(t, router, "example.com", storageKey)
@@ -855,7 +935,6 @@ func TestSendMessage_RecipientVariables(t *testing.T) {
 			t.Fatalf("expected 200 on GET, got %d (body: %s)", getRec.Code, getRec.Body.String())
 		}
 		body := getRec.Body.String()
-		// The stored message should contain the recipient variables
 		if !strings.Contains(body, "Alice") && !strings.Contains(body, "recipient-variables") {
 			t.Errorf("expected stored message to contain recipient variable data, body: %s", body)
 		}
@@ -912,9 +991,6 @@ func TestSendMessage_MessageIDFormat(t *testing.T) {
 	})
 
 	t.Run("ID matches timestamp.random@domain pattern", func(t *testing.T) {
-		// Pattern: <timestamp.random@domain>
-		// The timestamp and random parts should be separated by a dot,
-		// followed by @domain
 		pattern := `^<\d+\.\w+@example\.com>$`
 		matched, err := regexp.MatchString(pattern, resp.ID)
 		if err != nil {
@@ -961,7 +1037,6 @@ func TestSendMessage_TrackingOptions(t *testing.T) {
 		}
 	})
 
-	// Retrieve and verify tracking options are stored
 	t.Run("stored message contains tracking options", func(t *testing.T) {
 		storageKey := extractStorageKey(t, resp)
 		getRec := getMessage(t, router, "example.com", storageKey)
@@ -969,7 +1044,6 @@ func TestSendMessage_TrackingOptions(t *testing.T) {
 			t.Fatalf("expected 200 on GET, got %d (body: %s)", getRec.Code, getRec.Body.String())
 		}
 		body := getRec.Body.String()
-		// The stored message should contain tracking-related information
 		if !strings.Contains(body, "tracking") && !strings.Contains(body, "Tracking") {
 			t.Errorf("expected stored message to contain tracking information, body: %s", body)
 		}
@@ -1055,7 +1129,7 @@ func TestDeleteMessage_NotFound(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Scenario 20: Messages are domain-scoped -- Send on domain A, cannot retrieve from domain B
+// Scenario 20: Messages are domain-scoped
 // ---------------------------------------------------------------------------
 
 func TestMessage_DomainScoped(t *testing.T) {
@@ -1065,7 +1139,6 @@ func TestMessage_DomainScoped(t *testing.T) {
 	createTestDomain(t, router, "alpha.com")
 	createTestDomain(t, router, "beta.com")
 
-	// Send a message on alpha.com
 	sendRec := sendMessage(t, router, "alpha.com", map[string]string{
 		"from":    "sender@alpha.com",
 		"to":      "recipient@example.com",
@@ -1079,7 +1152,6 @@ func TestMessage_DomainScoped(t *testing.T) {
 
 	var sendResp sendResponse
 	decodeJSON(t, sendRec, &sendResp)
-
 	storageKey := extractStorageKey(t, sendResp)
 
 	t.Run("can retrieve from alpha.com", func(t *testing.T) {
@@ -1107,7 +1179,6 @@ func TestMessageLifecycle(t *testing.T) {
 	router := setupRouter(db, cfg)
 	createTestDomain(t, router, "example.com")
 
-	// Step 1: Send a message
 	var storageKey string
 	t.Run("send message", func(t *testing.T) {
 		rec := sendMessage(t, router, "example.com", map[string]string{
@@ -1131,7 +1202,6 @@ func TestMessageLifecycle(t *testing.T) {
 		storageKey = extractStorageKey(t, resp)
 	})
 
-	// Step 2: Retrieve the message and verify
 	t.Run("retrieve message", func(t *testing.T) {
 		if storageKey == "" {
 			t.Skip("no storage key from send step")
@@ -1156,7 +1226,6 @@ func TestMessageLifecycle(t *testing.T) {
 		}
 	})
 
-	// Step 3: Delete the message
 	t.Run("delete message", func(t *testing.T) {
 		if storageKey == "" {
 			t.Skip("no storage key from send step")
@@ -1172,7 +1241,6 @@ func TestMessageLifecycle(t *testing.T) {
 		}
 	})
 
-	// Step 4: Verify the message is gone
 	t.Run("retrieve after delete returns 404", func(t *testing.T) {
 		if storageKey == "" {
 			t.Skip("no storage key from send step")
@@ -1246,6 +1314,642 @@ func TestSendMessage_TemplateAsBody(t *testing.T) {
 	t.Run("returns message ID", func(t *testing.T) {
 		if resp.ID == "" {
 			t.Error("expected non-empty message ID")
+		}
+	})
+}
+
+// ===========================================================================
+// MIME Sending -- POST /v3/{domain_name}/messages.mime
+// ===========================================================================
+
+// sampleMIME is a minimal valid MIME message for testing.
+const sampleMIME = "From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: MIME Test Subject\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=\"UTF-8\"\r\n\r\nThis is the MIME body.\r\n"
+
+// ---------------------------------------------------------------------------
+// Scenario 22: Basic MIME send -- POST with to and message file -> 200
+// ---------------------------------------------------------------------------
+
+func TestSendMIMEMessage_Basic(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	rec := sendMIMEMessage(t, router, "example.com", "recipient@example.com", []byte(sampleMIME), nil)
+
+	t.Run("returns 200", func(t *testing.T) {
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	var sendResp sendResponse
+	decodeJSON(t, rec, &sendResp)
+
+	t.Run("returns message ID in angle brackets", func(t *testing.T) {
+		if sendResp.ID == "" {
+			t.Error("expected non-empty message ID")
+		}
+		if !strings.HasPrefix(sendResp.ID, "<") || !strings.HasSuffix(sendResp.ID, ">") {
+			t.Errorf("expected ID in angle brackets, got %q", sendResp.ID)
+		}
+	})
+
+	t.Run("returns queued message", func(t *testing.T) {
+		if sendResp.Message != "Queued. Thank you." {
+			t.Errorf("expected %q, got %q", "Queued. Thank you.", sendResp.Message)
+		}
+	})
+
+	t.Run("message ID ends with @domain", func(t *testing.T) {
+		inner := strings.TrimPrefix(sendResp.ID, "<")
+		inner = strings.TrimSuffix(inner, ">")
+		if !strings.HasSuffix(inner, "@example.com") {
+			t.Errorf("expected ID to end with '@example.com', got %q", sendResp.ID)
+		}
+	})
+
+	t.Run("message ID matches expected pattern", func(t *testing.T) {
+		pattern := `^<\d+\.\w+@example\.com>$`
+		matched, err := regexp.MatchString(pattern, sendResp.ID)
+		if err != nil {
+			t.Fatalf("failed to compile regex: %v", err)
+		}
+		if !matched {
+			t.Errorf("expected ID to match pattern %q, got %q", pattern, sendResp.ID)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 23: MIME send missing "to" -> 400
+// ---------------------------------------------------------------------------
+
+func TestSendMIMEMessage_MissingTo(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	// Send with file but no "to" field
+	mimeURL := fmt.Sprintf("/v3/%s/messages.mime", "example.com")
+	req := newMultipartRequestWithFile(t, http.MethodPost, mimeURL, "message", "message.mime", []byte(sampleMIME), nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	t.Run("returns 400", func(t *testing.T) {
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("body contains error message", func(t *testing.T) {
+		var errResp errorResponse
+		decodeJSON(t, rec, &errResp)
+		if errResp.Message == "" {
+			t.Error("expected non-empty error message")
+		}
+		if !strings.Contains(strings.ToLower(errResp.Message), "to") {
+			t.Errorf("expected error message to mention 'to', got %q", errResp.Message)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 24: MIME send missing "message" file -> 400
+// ---------------------------------------------------------------------------
+
+func TestSendMIMEMessage_MissingFile(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	rec := sendMIMEMessageNoFile(t, router, "example.com", map[string]string{
+		"to": "recipient@example.com",
+	})
+
+	t.Run("returns 400", func(t *testing.T) {
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("body contains error message about message", func(t *testing.T) {
+		var errResp errorResponse
+		decodeJSON(t, rec, &errResp)
+		if errResp.Message == "" {
+			t.Error("expected non-empty error message")
+		}
+		if !strings.Contains(strings.ToLower(errResp.Message), "message") {
+			t.Errorf("expected error message to mention 'message', got %q", errResp.Message)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 25: MIME send to invalid (non-existent) domain -> 404
+// ---------------------------------------------------------------------------
+
+func TestSendMIMEMessage_InvalidDomain(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+
+	rec := sendMIMEMessage(t, router, "nonexistent.com", "recipient@example.com", []byte(sampleMIME), nil)
+
+	t.Run("returns 404", func(t *testing.T) {
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 26: MIME send with o:tag values -> stored with tags
+// ---------------------------------------------------------------------------
+
+func TestSendMIMEMessage_WithTags(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	rec := sendMIMEMessage(t, router, "example.com", "recipient@example.com", []byte(sampleMIME), map[string]string{
+		"o:tag": "mime-tag",
+	})
+
+	t.Run("returns 200", func(t *testing.T) {
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	var sendResp sendResponse
+	decodeJSON(t, rec, &sendResp)
+
+	t.Run("stored message contains tags", func(t *testing.T) {
+		storageKey := extractStorageKey(t, sendResp)
+		getRec := getMessage(t, router, "example.com", storageKey)
+		if getRec.Code != http.StatusOK {
+			t.Fatalf("expected 200 on GET, got %d (body: %s)", getRec.Code, getRec.Body.String())
+		}
+		body := getRec.Body.String()
+		if !strings.Contains(body, "mime-tag") {
+			t.Errorf("expected stored message to contain tag 'mime-tag', body: %s", body)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 27: MIME send with recipient-variables -> stored
+// ---------------------------------------------------------------------------
+
+func TestSendMIMEMessage_WithRecipientVariables(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	recipientVars := `{"recipient@example.com":{"name":"Test User","id":42}}`
+	rec := sendMIMEMessage(t, router, "example.com", "recipient@example.com", []byte(sampleMIME), map[string]string{
+		"recipient-variables": recipientVars,
+	})
+
+	t.Run("returns 200", func(t *testing.T) {
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	var sendResp sendResponse
+	decodeJSON(t, rec, &sendResp)
+
+	t.Run("stored message contains recipient-variables", func(t *testing.T) {
+		storageKey := extractStorageKey(t, sendResp)
+		getRec := getMessage(t, router, "example.com", storageKey)
+		if getRec.Code != http.StatusOK {
+			t.Fatalf("expected 200 on GET, got %d (body: %s)", getRec.Code, getRec.Body.String())
+		}
+		body := getRec.Body.String()
+		if !strings.Contains(body, "Test User") && !strings.Contains(body, "recipient-variables") {
+			t.Errorf("expected stored message to contain recipient variable data, body: %s", body)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 28: Retrieve a MIME-sent message -> verify MIME content is available
+// ---------------------------------------------------------------------------
+
+func TestSendMIMEMessage_RetrieveVerifyMIMEContent(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	mimeContent := []byte("From: mime-sender@example.com\r\nTo: mime-recipient@example.com\r\nSubject: MIME Retrieval Test\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=\"UTF-8\"\r\n\r\nThis is a test MIME body for retrieval.\r\n")
+
+	rec := sendMIMEMessage(t, router, "example.com", "mime-recipient@example.com", mimeContent, nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("failed to send MIME message: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var sendResp sendResponse
+	decodeJSON(t, rec, &sendResp)
+	storageKey := extractStorageKey(t, sendResp)
+
+	t.Run("retrieve returns 200", func(t *testing.T) {
+		getRec := getMessage(t, router, "example.com", storageKey)
+		if getRec.Code != http.StatusOK {
+			t.Errorf("expected 200 on GET, got %d (body: %s)", getRec.Code, getRec.Body.String())
+		}
+	})
+
+	t.Run("retrieved message references MIME content", func(t *testing.T) {
+		getRec := getMessage(t, router, "example.com", storageKey)
+		if getRec.Code != http.StatusOK {
+			t.Fatalf("expected 200 on GET, got %d (body: %s)", getRec.Code, getRec.Body.String())
+		}
+		body := getRec.Body.String()
+		if !strings.Contains(body, "MIME") && !strings.Contains(body, "mime") {
+			t.Errorf("expected stored message to contain MIME content reference, body: %s", body)
+		}
+	})
+}
+
+// ===========================================================================
+// Message Resend -- POST /v3/domains/{domain_name}/messages/{storage_key}
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Scenario 29: Resend a message to a new recipient -> 200 with new message ID
+// ---------------------------------------------------------------------------
+
+func TestResendMessage_Basic(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	sendRec := sendMessage(t, router, "example.com", map[string]string{
+		"from":    "sender@example.com",
+		"to":      "original-recipient@example.com",
+		"subject": "Resend Test Original",
+		"text":    "Original message body for resend",
+		"html":    "<p>Original HTML body</p>",
+	})
+
+	if sendRec.Code != http.StatusOK {
+		t.Fatalf("failed to send original message: status=%d body=%s", sendRec.Code, sendRec.Body.String())
+	}
+
+	var origResp sendResponse
+	decodeJSON(t, sendRec, &origResp)
+	origStorageKey := extractStorageKey(t, origResp)
+
+	resendRec := resendMessage(t, router, "example.com", origStorageKey, map[string]string{
+		"to": "new-recipient@example.com",
+	})
+
+	t.Run("returns 200", func(t *testing.T) {
+		if resendRec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d (body: %s)", resendRec.Code, resendRec.Body.String())
+		}
+	})
+
+	var resendResp sendResponse
+	decodeJSON(t, resendRec, &resendResp)
+
+	t.Run("returns new message ID", func(t *testing.T) {
+		if resendResp.ID == "" {
+			t.Error("expected non-empty message ID")
+		}
+		if !strings.HasPrefix(resendResp.ID, "<") || !strings.HasSuffix(resendResp.ID, ">") {
+			t.Errorf("expected ID in angle brackets, got %q", resendResp.ID)
+		}
+	})
+
+	t.Run("returns queued message", func(t *testing.T) {
+		if resendResp.Message != "Queued. Thank you." {
+			t.Errorf("expected %q, got %q", "Queued. Thank you.", resendResp.Message)
+		}
+	})
+
+	t.Run("new message ID is different from original", func(t *testing.T) {
+		if resendResp.ID == origResp.ID {
+			t.Errorf("expected new message ID to differ from original, both are %q", resendResp.ID)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 30: Resend to non-existent storage key -> 404
+// ---------------------------------------------------------------------------
+
+func TestResendMessage_NonExistentStorageKey(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	rec := resendMessage(t, router, "example.com", "nonexistent-storage-key", map[string]string{
+		"to": "new-recipient@example.com",
+	})
+
+	t.Run("returns 404", func(t *testing.T) {
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 31: Resend with missing "to" -> 400
+// ---------------------------------------------------------------------------
+
+func TestResendMessage_MissingTo(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	sendRec := sendMessage(t, router, "example.com", map[string]string{
+		"from":    "sender@example.com",
+		"to":      "original@example.com",
+		"subject": "Resend Missing To",
+		"text":    "Original body",
+	})
+
+	if sendRec.Code != http.StatusOK {
+		t.Fatalf("failed to send original message: status=%d body=%s", sendRec.Code, sendRec.Body.String())
+	}
+
+	var origResp sendResponse
+	decodeJSON(t, sendRec, &origResp)
+	origStorageKey := extractStorageKey(t, origResp)
+
+	rec := resendMessage(t, router, "example.com", origStorageKey, map[string]string{})
+
+	t.Run("returns 400", func(t *testing.T) {
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("body contains error message", func(t *testing.T) {
+		var errResp errorResponse
+		decodeJSON(t, rec, &errResp)
+		if errResp.Message == "" {
+			t.Error("expected non-empty error message")
+		}
+		if !strings.Contains(strings.ToLower(errResp.Message), "to") {
+			t.Errorf("expected error message to mention 'to', got %q", errResp.Message)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 32: Retrieve the resent message -> verify new recipients, same subject/body
+// ---------------------------------------------------------------------------
+
+func TestResendMessage_RetrieveResentMessage(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	sendRec := sendMessage(t, router, "example.com", map[string]string{
+		"from":    "sender@example.com",
+		"to":      "original-recipient@example.com",
+		"subject": "Resend Retrieve Test",
+		"text":    "Original plain body for resend retrieval",
+		"html":    "<p>Original HTML for resend retrieval</p>",
+	})
+
+	if sendRec.Code != http.StatusOK {
+		t.Fatalf("failed to send original message: status=%d body=%s", sendRec.Code, sendRec.Body.String())
+	}
+
+	var origResp sendResponse
+	decodeJSON(t, sendRec, &origResp)
+	origStorageKey := extractStorageKey(t, origResp)
+
+	resendRec := resendMessage(t, router, "example.com", origStorageKey, map[string]string{
+		"to": "resend-target@example.com",
+	})
+
+	if resendRec.Code != http.StatusOK {
+		t.Fatalf("failed to resend message: status=%d body=%s", resendRec.Code, resendRec.Body.String())
+	}
+
+	var resendResp sendResponse
+	decodeJSON(t, resendRec, &resendResp)
+	resendStorageKey := extractStorageKey(t, resendResp)
+
+	getRec := getMessage(t, router, "example.com", resendStorageKey)
+
+	t.Run("returns 200", func(t *testing.T) {
+		if getRec.Code != http.StatusOK {
+			t.Errorf("expected 200 on GET, got %d (body: %s)", getRec.Code, getRec.Body.String())
+		}
+	})
+
+	var detail messageDetailResponse
+	decodeJSON(t, getRec, &detail)
+
+	t.Run("resent message has the new recipient", func(t *testing.T) {
+		if !strings.Contains(detail.To, "resend-target@example.com") {
+			t.Errorf("expected To to contain new recipient 'resend-target@example.com', got %q", detail.To)
+		}
+	})
+
+	t.Run("resent message preserves original subject", func(t *testing.T) {
+		if detail.Subject != "Resend Retrieve Test" {
+			t.Errorf("expected Subject=%q, got %q", "Resend Retrieve Test", detail.Subject)
+		}
+	})
+
+	t.Run("resent message preserves original plain body", func(t *testing.T) {
+		if detail.BodyPlain != "Original plain body for resend retrieval" {
+			t.Errorf("expected body-plain=%q, got %q", "Original plain body for resend retrieval", detail.BodyPlain)
+		}
+	})
+
+	t.Run("resent message preserves original HTML body", func(t *testing.T) {
+		if detail.BodyHTML != "<p>Original HTML for resend retrieval</p>" {
+			t.Errorf("expected body-html=%q, got %q", "<p>Original HTML for resend retrieval</p>", detail.BodyHTML)
+		}
+	})
+
+	t.Run("original message is still retrievable", func(t *testing.T) {
+		origGetRec := getMessage(t, router, "example.com", origStorageKey)
+		if origGetRec.Code != http.StatusOK {
+			t.Errorf("expected original message to still be retrievable, got %d", origGetRec.Code)
+		}
+	})
+}
+
+// ===========================================================================
+// Sending Queues (stub) -- GET /v3/domains/{name}/sending_queues
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Scenario 33: Get sending queues for valid domain -> 200 with static response
+// ---------------------------------------------------------------------------
+
+func TestGetSendingQueues_ValidDomain(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	rec := getSendingQueues(t, router, "example.com")
+
+	t.Run("returns 200", func(t *testing.T) {
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	var qResp sendingQueuesResponse
+	decodeJSON(t, rec, &qResp)
+
+	t.Run("regular queue is not disabled", func(t *testing.T) {
+		if qResp.Regular.IsDisabled {
+			t.Error("expected regular queue is_disabled to be false")
+		}
+	})
+
+	t.Run("regular queue disabled reason is empty", func(t *testing.T) {
+		if qResp.Regular.Disabled.Until != "" {
+			t.Errorf("expected regular queue disabled.until to be empty, got %q", qResp.Regular.Disabled.Until)
+		}
+		if qResp.Regular.Disabled.Reason != "" {
+			t.Errorf("expected regular queue disabled.reason to be empty, got %q", qResp.Regular.Disabled.Reason)
+		}
+	})
+
+	t.Run("scheduled queue is not disabled", func(t *testing.T) {
+		if qResp.Scheduled.IsDisabled {
+			t.Error("expected scheduled queue is_disabled to be false")
+		}
+	})
+
+	t.Run("scheduled queue disabled reason is empty", func(t *testing.T) {
+		if qResp.Scheduled.Disabled.Until != "" {
+			t.Errorf("expected scheduled queue disabled.until to be empty, got %q", qResp.Scheduled.Disabled.Until)
+		}
+		if qResp.Scheduled.Disabled.Reason != "" {
+			t.Errorf("expected scheduled queue disabled.reason to be empty, got %q", qResp.Scheduled.Disabled.Reason)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 34: Get sending queues for non-existent domain -> 404
+// ---------------------------------------------------------------------------
+
+func TestGetSendingQueues_NonExistentDomain(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+
+	rec := getSendingQueues(t, router, "nonexistent.com")
+
+	t.Run("returns 404", func(t *testing.T) {
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+// ===========================================================================
+// Purge Queue (stub) -- DELETE /v3/{domain_name}/envelopes
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Scenario 35: Purge queue for valid domain -> 200 with "done" message
+// ---------------------------------------------------------------------------
+
+func TestPurgeQueue_ValidDomain(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	rec := purgeQueue(t, router, "example.com")
+
+	t.Run("returns 200", func(t *testing.T) {
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+
+	var pResp purgeQueueResponse
+	decodeJSON(t, rec, &pResp)
+
+	t.Run("returns done message", func(t *testing.T) {
+		if pResp.Message != "done" {
+			t.Errorf("expected %q, got %q", "done", pResp.Message)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 36: Purge queue for non-existent domain -> 404
+// ---------------------------------------------------------------------------
+
+func TestPurgeQueue_NonExistentDomain(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+
+	rec := purgeQueue(t, router, "nonexistent.com")
+
+	t.Run("returns 404", func(t *testing.T) {
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d (body: %s)", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 37: Purge queue is idempotent -- calling twice succeeds both times
+// ---------------------------------------------------------------------------
+
+func TestPurgeQueue_Idempotent(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := defaultConfig()
+	router := setupRouter(db, cfg)
+	createTestDomain(t, router, "example.com")
+
+	rec1 := purgeQueue(t, router, "example.com")
+	rec2 := purgeQueue(t, router, "example.com")
+
+	t.Run("first call returns 200", func(t *testing.T) {
+		if rec1.Code != http.StatusOK {
+			t.Errorf("expected 200 on first call, got %d (body: %s)", rec1.Code, rec1.Body.String())
+		}
+	})
+
+	t.Run("second call returns 200", func(t *testing.T) {
+		if rec2.Code != http.StatusOK {
+			t.Errorf("expected 200 on second call, got %d (body: %s)", rec2.Code, rec2.Body.String())
+		}
+	})
+
+	var pResp1, pResp2 purgeQueueResponse
+	decodeJSON(t, rec1, &pResp1)
+	decodeJSON(t, rec2, &pResp2)
+
+	t.Run("both calls return done", func(t *testing.T) {
+		if pResp1.Message != "done" {
+			t.Errorf("first call: expected %q, got %q", "done", pResp1.Message)
+		}
+		if pResp2.Message != "done" {
+			t.Errorf("second call: expected %q, got %q", "done", pResp2.Message)
 		}
 	})
 }
