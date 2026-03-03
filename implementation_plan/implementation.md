@@ -15,7 +15,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 6 | Templates | done | CRUD, versioning, Handlebars rendering |
 | 7 | Tags & Stats | done | Auto-creation, time-series stats, v1 stubs, singular path support |
 | 8 | Mailing Lists | done | List/member CRUD, bulk ops, send integration |
-| 9 | Webhooks | pending | v3/v4/v1 APIs, delivery pipeline, signing |
+| 9 | Webhooks | done | v3/v4/v1 APIs, delivery pipeline, signing |
 | 10 | Routes | pending | CRUD, expression parser, inbound simulation |
 | 11 | IPs & IP Pools | pending | Stub — static IPs, pool CRUD |
 | 12 | Subaccounts | pending | CRUD, limits, feature flags, isolation |
@@ -344,38 +344,38 @@ Register URLs and deliver event payloads with signatures.
 > Plan doc: [webhooks.md](./webhooks.md)
 
 ### v3 Domain Webhooks (per event type)
-- [ ] Model: `Webhook` (domain, event_type, urls[], active)
-- [ ] `GET /v3/domains/{domain}/webhooks` — list all
-- [ ] `GET /v3/domains/{domain}/webhooks/{webhook_name}` — get single
-- [ ] `POST /v3/domains/{domain}/webhooks` — create
-- [ ] `PUT /v3/domains/{domain}/webhooks/{webhook_name}` — update
-- [ ] `DELETE /v3/domains/{domain}/webhooks/{webhook_name}` — delete
+- [x] Model: `Webhook` (domain, event_type, urls[], active)
+- [x] `GET /v3/domains/{domain}/webhooks` — list all
+- [x] `GET /v3/domains/{domain}/webhooks/{webhook_name}` — get single
+- [x] `POST /v3/domains/{domain}/webhooks` — create
+- [x] `PUT /v3/domains/{domain}/webhooks/{webhook_name}` — update
+- [x] `DELETE /v3/domains/{domain}/webhooks/{webhook_name}` — delete
 
 ### v4 Domain Webhooks (URL-centric)
-- [ ] `POST /v4/domains/{domain}/webhooks` — create
-- [ ] `PUT /v4/domains/{domain}/webhooks/{webhook_id}` — update
-- [ ] `DELETE /v4/domains/{domain}/webhooks/{webhook_id}` — delete
+- [x] `POST /v4/domains/{domain}/webhooks` — create
+- [x] `PUT /v4/domains/{domain}/webhooks/{webhook_id}` — update
+- [x] `DELETE /v4/domains/{domain}/webhooks/{webhook_id}` — delete
 
 ### v1 Account Webhooks
-- [ ] `GET /v1/webhooks` — list
-- [ ] `POST /v1/webhooks` — create
-- [ ] `PUT /v1/webhooks/{webhook_id}` — update
-- [ ] `DELETE /v1/webhooks/{webhook_id}` — delete
+- [x] `GET /v1/webhooks` — list
+- [x] `POST /v1/webhooks` — create
+- [x] `PUT /v1/webhooks/{webhook_id}` — update
+- [x] `DELETE /v1/webhooks/{webhook_id}` — delete
 
 ### Webhook Delivery Pipeline
-- [ ] Build event payload in Webhooks 2.0 format (`signature` + `event-data`)
-- [ ] Sign payloads with HMAC-SHA256 using webhook signing key
-- [ ] Deliver via HTTP POST to registered URLs
-- [ ] Retry logic: configurable `immediate` (1 retry) or `realistic` (8 attempts with backoff) — see [web-ui.md](./web-ui.md) config
-- [ ] Deduplicate across domain-level and account-level webhooks
+- [x] Build event payload in Webhooks 2.0 format (`signature` + `event-data`)
+- [x] Sign payloads with HMAC-SHA256 using webhook signing key
+- [x] Deliver via HTTP POST to registered URLs
+- [x] Retry logic: configurable `immediate` (1 retry) or `realistic` (8 attempts with backoff) — see [web-ui.md](./web-ui.md) config
+- [x] Deduplicate across domain-level and account-level webhooks
 
 ### Webhook Signing Key
-- [ ] `GET /v5/accounts/http_signing_key` — get current signing key
-- [ ] `POST /v5/accounts/http_signing_key` — rotate signing key
+- [x] `GET /v5/accounts/http_signing_key` — get current signing key
+- [x] `POST /v5/accounts/http_signing_key` — rotate signing key
 
 ### Mock Webhook Inspection
-- [ ] `GET /mock/webhooks/deliveries` — list delivery attempts with status
-- [ ] `POST /mock/webhooks/trigger` — manually trigger a webhook delivery
+- [x] `GET /mock/webhooks/deliveries` — list delivery attempts with status
+- [x] `POST /mock/webhooks/trigger` — manually trigger a webhook delivery
 
 ---
 

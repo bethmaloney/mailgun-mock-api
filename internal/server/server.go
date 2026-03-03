@@ -15,6 +15,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/suppression"
 	"github.com/bethmaloney/mailgun-mock-api/internal/tag"
 	"github.com/bethmaloney/mailgun-mock-api/internal/template"
+	"github.com/bethmaloney/mailgun-mock-api/internal/webhook"
 	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
@@ -44,7 +45,8 @@ func New(db *gorm.DB) http.Handler {
 		&suppression.Bounce{}, &suppression.Complaint{}, &suppression.Unsubscribe{}, &suppression.AllowlistEntry{},
 		&template.Template{}, &template.TemplateVersion{},
 		&tag.Tag{},
-		&mailinglist.MailingList{}, &mailinglist.MailingListMember{})
+		&mailinglist.MailingList{}, &mailinglist.MailingListMember{},
+		&webhook.DomainWebhook{}, &webhook.AccountWebhook{}, &webhook.WebhookDelivery{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -76,6 +78,9 @@ func New(db *gorm.DB) http.Handler {
 	// Mailing list handlers
 	mlh := mailinglist.NewHandlers(db)
 
+	// Webhook handlers
+	wh := webhook.NewHandlers(db, h.Config())
+
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
 	mh.SetEventHandlers(eh)
@@ -87,6 +92,10 @@ func New(db *gorm.DB) http.Handler {
 		r.Get("/{name}", dh.GetDomain)
 		r.Put("/{name}", dh.UpdateDomain)
 		r.Put("/{name}/verify", dh.VerifyDomain)
+		// v4 webhook routes
+		r.Post("/{name}/webhooks", wh.V4CreateWebhook)
+		r.Put("/{name}/webhooks", wh.V4UpdateWebhook)
+		r.Delete("/{name}/webhooks", wh.V4DeleteWebhook)
 	})
 
 	r.Route("/v3/domains", func(r chi.Router) {
@@ -107,6 +116,31 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/{name}/credentials", ch.DeleteAllCredentials)
 		r.Put("/{name}/credentials/{spec}", ch.UpdateCredential)
 		r.Delete("/{name}/credentials/{spec}", ch.DeleteCredential)
+	})
+
+	// v3 domain webhook routes
+	r.Route("/v3/domains/{domain_name}/webhooks", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", wh.ListWebhooks)
+		r.Post("/", wh.CreateWebhook)
+		r.Get("/{webhook_name}", wh.GetWebhook)
+		r.Put("/{webhook_name}", wh.UpdateWebhook)
+		r.Delete("/{webhook_name}", wh.DeleteWebhook)
+	})
+
+	// v5 signing key routes
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v5/accounts/http_signing_key", wh.GetSigningKey)
+	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v5/accounts/http_signing_key", wh.RegenerateSigningKey)
+
+	// v1 account webhook routes
+	r.Route("/v1/webhooks", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", wh.ListAccountWebhooks)
+		r.Post("/", wh.CreateAccountWebhook)
+		r.Delete("/", wh.BulkDeleteAccountWebhooks)
+		r.Get("/{webhook_id}", wh.GetAccountWebhook)
+		r.Put("/{webhook_id}", wh.UpdateAccountWebhook)
+		r.Delete("/{webhook_id}", wh.DeleteAccountWebhook)
 	})
 
 	// Message sending route
@@ -281,6 +315,9 @@ func New(db *gorm.DB) http.Handler {
 		// so that chi matches the static path before the wildcard.
 		r.Post("/reset/messages", h.ResetMessages)
 		r.Post("/reset/{domain}", h.ResetDomain)
+		// Mock webhook inspection
+		r.Get("/webhooks/deliveries", wh.ListDeliveries)
+		r.Post("/webhooks/trigger", wh.TriggerWebhook)
 		// Mock event triggers
 		r.Route("/events/{domain}", func(r chi.Router) {
 			r.Post("/deliver/{message_id}", eh.TriggerDeliver)
