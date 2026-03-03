@@ -12,7 +12,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 3 | Messages & Storage | in progress | Send, store, retrieve, resend |
 | 4 | Events & Logs | in progress | Generation pipeline, querying, mock triggers |
 | 5 | Suppressions | in progress | Bounces, complaints, unsubscribes, allowlist |
-| 6 | Templates | pending | CRUD, versioning, Handlebars rendering |
+| 6 | Templates | in progress | CRUD, versioning, Handlebars rendering |
 | 7 | Tags & Stats | pending | Auto-creation, time-series stats, v1 stubs |
 | 8 | Mailing Lists | pending | List/member CRUD, bulk ops, send integration |
 | 9 | Webhooks | pending | v3/v4/v1 APIs, delivery pipeline, signing |
@@ -242,21 +242,21 @@ Server-side templates with versioning and rendering.
 > Plan doc: [templates.md](./templates.md)
 
 ### Template CRUD
-- [ ] Model: `Template` (name lowercased, description, createdAt — camelCase)
-- [ ] `GET /v3/{domain}/templates` — list with pagination (paginate by name)
-- [ ] `GET /v3/{domain}/templates/{name}` — get single (optionally include active version)
-- [ ] `POST /v3/{domain}/templates` — create (with optional initial version)
-- [ ] `PUT /v3/{domain}/templates/{name}` — update description
-- [ ] `DELETE /v3/{domain}/templates/{name}` — delete with all versions
+- [x] Model: `Template` (name lowercased, description, createdAt — camelCase)
+- [x] `GET /v3/{domain}/templates` — list with pagination (paginate by name)
+- [x] `GET /v3/{domain}/templates/{name}` — get single (optionally include active version)
+- [x] `POST /v3/{domain}/templates` — create (with optional initial version)
+- [x] `PUT /v3/{domain}/templates/{name}` — update description
+- [x] `DELETE /v3/{domain}/templates/{name}` — delete with all versions
 
 ### Version Management
-- [ ] Model: `TemplateVersion` (tag lowercased, template body, engine, active flag, mjml field, comment)
-- [ ] `GET /v3/{domain}/templates/{name}/versions` — list versions (paginate by tag)
-- [ ] `GET /v3/{domain}/templates/{name}/versions/{tag}` — get single version
-- [ ] `POST /v3/{domain}/templates/{name}/versions` — create version (max 40 per template)
-- [ ] `PUT /v3/{domain}/templates/{name}/versions/{tag}` — update (setting `active: yes` deactivates others)
-- [ ] `DELETE /v3/{domain}/templates/{name}/versions/{tag}` — delete version
-- [ ] `PUT /v3/{domain}/templates/{name}/versions/{tag}/copy/{new_tag}` — copy version
+- [x] Model: `TemplateVersion` (tag lowercased, template body, engine, active flag, mjml field, comment)
+- [x] `GET /v3/{domain}/templates/{name}/versions` — list versions (paginate by tag)
+- [x] `GET /v3/{domain}/templates/{name}/versions/{tag}` — get single version
+- [x] `POST /v3/{domain}/templates/{name}/versions` — create version (max 40 per template)
+- [x] `PUT /v3/{domain}/templates/{name}/versions/{tag}` — update (setting `active: yes` deactivates others)
+- [x] `DELETE /v3/{domain}/templates/{name}/versions/{tag}` — delete version
+- [x] `PUT /v3/{domain}/templates/{name}/versions/{tag}/copy/{new_tag}` — copy version
 
 ### Template Rendering
 - [ ] Integrate Handlebars rendering (Go library) with custom `equal` helper

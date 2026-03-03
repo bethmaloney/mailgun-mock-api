@@ -12,6 +12,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/event"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
 	"github.com/bethmaloney/mailgun-mock-api/internal/suppression"
+	"github.com/bethmaloney/mailgun-mock-api/internal/template"
 	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
@@ -38,7 +39,8 @@ func New(db *gorm.DB) http.Handler {
 
 	// Run model migrations.
 	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &event.Event{},
-		&suppression.Bounce{}, &suppression.Complaint{}, &suppression.Unsubscribe{}, &suppression.AllowlistEntry{})
+		&suppression.Bounce{}, &suppression.Complaint{}, &suppression.Unsubscribe{}, &suppression.AllowlistEntry{},
+		&template.Template{}, &template.TemplateVersion{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -60,6 +62,9 @@ func New(db *gorm.DB) http.Handler {
 
 	// Suppression handlers
 	sh := suppression.NewHandlers(db)
+
+	// Template handlers
+	th := template.NewHandlers(db)
 
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
@@ -156,6 +161,23 @@ func New(db *gorm.DB) http.Handler {
 		r.Get("/{value}", sh.GetAllowlistEntry)
 		r.Delete("/{value}", sh.DeleteAllowlistEntry)
 		r.Delete("/", sh.ClearAllowlist)
+	})
+
+	// Template routes
+	r.Route("/v3/{domain_name}/templates", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Post("/", th.CreateTemplate)
+		r.Get("/", th.ListTemplates)
+		r.Delete("/", th.DeleteAllTemplates)
+		r.Get("/{name}", th.GetTemplate)
+		r.Put("/{name}", th.UpdateTemplate)
+		r.Delete("/{name}", th.DeleteTemplate)
+		r.Post("/{name}/versions", th.CreateVersion)
+		r.Get("/{name}/versions", th.ListVersions)
+		r.Get("/{name}/versions/{tag}", th.GetVersion)
+		r.Put("/{name}/versions/{tag}", th.UpdateVersion)
+		r.Delete("/{name}/versions/{tag}", th.DeleteVersion)
+		r.Put("/{name}/versions/{tag}/copy/{new_tag}", th.CopyVersion)
 	})
 
 	// API Key routes
