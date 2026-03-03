@@ -9,7 +9,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 0 | Foundation & Cross-cutting | in progress | Auth, pagination, config, response formatting |
 | 1 | Domains | done | CRUD, verification, tracking, connection settings |
 | 2 | Credentials & Keys | done | SMTP creds, API keys, IP allowlist |
-| 3 | Messages & Storage | in progress | Send, store, retrieve, resend |
+| 3 | Messages & Storage | done | Send, store, retrieve, resend |
 | 4 | Events & Logs | in progress | Generation pipeline, querying, mock triggers |
 | 5 | Suppressions | in progress | Bounces, complaints, unsubscribes, allowlist |
 | 6 | Templates | in progress | CRUD, versioning, Handlebars rendering |
@@ -155,7 +155,7 @@ Core message acceptance pipeline. Generates events that feed into all downstream
 - [x] Generate storage keys (opaque format, e.g., `mock-<uuid>`)
 - [x] `GET /v3/domains/{domain}/messages/{storage_key}` — retrieve stored message with full headers
 - [x] `DELETE /v3/domains/{domain}/messages/{storage_key}` — delete stored message
-- [ ] Store attachment bytes; serve via storage URL in message detail
+- [x] Store attachment bytes; serve via storage URL in message detail
 
 ### Message Resend
 - [x] `POST /v3/domains/{domain}/messages/{storage_key}` — resend to new recipients

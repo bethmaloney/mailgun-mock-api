@@ -5,7 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -221,6 +224,47 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Save file attachments
+	if r.MultipartForm != nil {
+		for _, fieldName := range []string{"attachment", "inline"} {
+			files := r.MultipartForm.File[fieldName]
+			isInline := fieldName == "inline"
+			for _, fileHeader := range files {
+				file, err := fileHeader.Open()
+				if err != nil {
+					continue
+				}
+				content, err := io.ReadAll(file)
+				file.Close()
+				if err != nil {
+					continue
+				}
+
+				contentType := fileHeader.Header.Get("Content-Type")
+				if contentType == "" || contentType == "application/octet-stream" {
+					if ext := filepath.Ext(fileHeader.Filename); ext != "" {
+						if mimeType := mime.TypeByExtension(ext); mimeType != "" {
+							contentType = mimeType
+						}
+					}
+					if contentType == "" || contentType == "application/octet-stream" {
+						contentType = "application/octet-stream"
+					}
+				}
+
+				att := Attachment{
+					StoredMessageID: msg.ID,
+					FileName:        fileHeader.Filename,
+					ContentType:     contentType,
+					Size:            len(content),
+					Content:         content,
+					Inline:          isInline,
+				}
+				h.db.Create(&att)
+			}
+		}
+	}
+
 	// Auto-create tags
 	if len(tags) > 0 {
 		tag.EnsureTags(h.db, domainName, tags)
@@ -349,6 +393,21 @@ func (h *Handlers) GetMessage(w http.ResponseWriter, r *http.Request) {
 		resp["mime-body"] = msg.MIMEBody
 	}
 
+	// Add attachments
+	var attachments []Attachment
+	h.db.Where("stored_message_id = ?", msg.ID).Find(&attachments)
+
+	attList := make([]map[string]interface{}, 0, len(attachments))
+	for _, att := range attachments {
+		attList = append(attList, map[string]interface{}{
+			"size":         att.Size,
+			"url":          fmt.Sprintf("/v3/domains/%s/messages/%s/attachments/%s", domainName, storageKey, att.ID),
+			"filename":     att.FileName,
+			"content-type": att.ContentType,
+		})
+	}
+	resp["attachments"] = attList
+
 	response.RespondJSON(w, http.StatusOK, resp)
 }
 
@@ -362,6 +421,9 @@ func (h *Handlers) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		response.RespondError(w, http.StatusNotFound, "Message not found")
 		return
 	}
+
+	// Delete associated attachments
+	h.db.Unscoped().Where("stored_message_id = ?", msg.ID).Delete(&Attachment{})
 
 	if err := h.db.Unscoped().Delete(&msg).Error; err != nil {
 		response.RespondError(w, http.StatusInternalServerError, "Failed to delete message")

@@ -184,6 +184,21 @@ func (h *Handlers) ResendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Copy attachments from original message
+	var origAttachments []Attachment
+	h.db.Where("stored_message_id = ?", original.ID).Find(&origAttachments)
+	for _, origAtt := range origAttachments {
+		newAtt := Attachment{
+			StoredMessageID: msg.ID,
+			FileName:        origAtt.FileName,
+			ContentType:     origAtt.ContentType,
+			Size:            origAtt.Size,
+			Content:         origAtt.Content,
+			Inline:          origAtt.Inline,
+		}
+		h.db.Create(&newAtt)
+	}
+
 	response.RespondJSON(w, http.StatusOK, map[string]string{
 		"id":      messageID,
 		"message": "Queued. Thank you.",

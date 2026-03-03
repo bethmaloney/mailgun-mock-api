@@ -40,7 +40,7 @@ func New(db *gorm.DB) http.Handler {
 	}))
 
 	// Run model migrations.
-	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &event.Event{},
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &message.Attachment{}, &event.Event{},
 		&suppression.Bounce{}, &suppression.Complaint{}, &suppression.Unsubscribe{}, &suppression.AllowlistEntry{},
 		&template.Template{}, &template.TemplateVersion{},
 		&tag.Tag{},
@@ -130,6 +130,7 @@ func New(db *gorm.DB) http.Handler {
 		r.Get("/{storage_key}", mh.GetMessage)
 		r.Delete("/{storage_key}", mh.DeleteMessage)
 		r.Post("/{storage_key}", mh.ResendMessage)
+		r.Get("/{storage_key}/attachments/{attachment_id}", mh.GetAttachment)
 	})
 
 	// Sending queues route
