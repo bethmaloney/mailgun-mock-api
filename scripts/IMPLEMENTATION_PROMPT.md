@@ -42,7 +42,7 @@ The test writer sub-agent must:
 - Cover happy paths, validation errors, edge cases, and pagination where applicable
 - Tests should compile but are **expected to fail** (no implementation exists yet)
 - Run `go vet ./...` to verify no syntax issues
-- NOT write any implementation code — only test files
+- Only write test files and stubs if required to make the tests compile — do NOT write any implementation code
 
 ### Step 3: Launch Implementer Sub-Agent
 
@@ -84,7 +84,7 @@ The reviewer sub-agent must:
 
 ### Step 5: Fix Critical/High Issues (Conditional)
 
-If the reviewer reports any **CRITICAL** or **HIGH** severity issues, spawn a fixer sub-agent.
+If the reviewer reports any **CRITICAL** or **HIGH** severity issues, review the findings. If you agree with the findings, then spawn a fixer sub-agent.
 
 In your prompt to the fixer, include:
 - The specific CRITICAL/HIGH issues verbatim from the review
