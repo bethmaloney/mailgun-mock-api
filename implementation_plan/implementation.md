@@ -21,7 +21,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 12 | Subaccounts | done | CRUD, limits, feature flags, isolation |
 | 13 | Metrics & Analytics | done | v3 stats, v1 metrics, usage, bounce classification |
 | 14 | Web UI — Foundation | done | Shell, routing, dashboard |
-| 15 | Web UI — Messages & Events | pending | Message/event list and detail views |
+| 15 | Web UI — Messages & Events | done | Message/event list and detail views |
 | 16 | Web UI — Management | pending | Domains, suppressions, templates, lists, webhooks, routes |
 | 17 | Web UI — Testing & Real-time | pending | Event triggers, inbound sim, config, WebSocket |
 
@@ -510,17 +510,17 @@ Aggregate statistics derived from stored events.
 ## Phase 15: Web UI — Messages & Events
 
 ### Messages View
-- [ ] Messages list page: sortable table with from, to, subject, date, status
-- [ ] `GET /mock/messages` — paginated message list endpoint (distinct from Mailgun's storage API)
-- [ ] `GET /mock/messages/{id}` — full message detail endpoint
-- [ ] Message detail page: headers, plain text body, HTML body (rendered in sandboxed iframe), attachments list
-- [ ] `DELETE /mock/messages/{id}` — delete single message
-- [ ] `POST /mock/messages/clear` — clear all messages
+- [x] Messages list page: sortable table with from, to, subject, date, status
+- [x] `GET /mock/messages` — paginated message list endpoint (distinct from Mailgun's storage API)
+- [x] `GET /mock/messages/{id}` — full message detail endpoint
+- [x] Message detail page: headers, plain text body, HTML body (rendered in sandboxed iframe), attachments list
+- [x] `DELETE /mock/messages/{id}` — delete single message
+- [x] `POST /mock/messages/clear` — clear all messages
 
 ### Events View
-- [ ] Events list page: filterable log with color-coded event types
-- [ ] Filters: event type, recipient, date range
-- [ ] Event detail panel: full event JSON
+- [x] Events list page: filterable log with color-coded event types
+- [x] Filters: event type, recipient, date range
+- [x] Event detail panel: full event JSON
 
 ---
 

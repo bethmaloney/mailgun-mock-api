@@ -408,6 +408,11 @@ func New(db *gorm.DB) http.Handler {
 		// so that chi matches the static path before the wildcard.
 		r.Post("/reset/messages", h.ResetMessages)
 		r.Post("/reset/{domain}", h.ResetDomain)
+		// Mock messages (Web UI)
+		r.Get("/messages", h.ListMessages)
+		r.Post("/messages/clear", h.ClearAllMessages)
+		r.Get("/messages/{message_id}", h.GetMessageDetail)
+		r.Delete("/messages/{message_id}", h.DeleteSingleMessage)
 		// Mock inbound simulation
 		r.Post("/inbound/{domain}", rth.SimulateInbound)
 		// Mock webhook inspection
