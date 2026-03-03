@@ -8,7 +8,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 |-------|------|--------|-------|
 | 0 | Foundation & Cross-cutting | in progress | Auth, pagination, config, response formatting |
 | 1 | Domains | done | CRUD, verification, tracking, connection settings |
-| 2 | Credentials & Keys | in progress | SMTP creds, API keys, IP allowlist |
+| 2 | Credentials & Keys | done | SMTP creds, API keys, IP allowlist |
 | 3 | Messages & Storage | pending | Send, store, retrieve, resend |
 | 4 | Events & Logs | pending | Generation pipeline, querying, mock triggers |
 | 5 | Suppressions | pending | Bounces, complaints, unsubscribes, allowlist |
@@ -127,10 +127,10 @@ Auth infrastructure for the rest of the API. Implements alongside or immediately
 - [x] `GET /v1/keys/public` — get public verification key
 
 ### IP Allowlist (stub)
-- [ ] `GET /v2/ip_whitelist` — list
-- [ ] `POST /v2/ip_whitelist` — add
-- [ ] `PUT /v2/ip_whitelist/{id}` — update
-- [ ] `DELETE /v2/ip_whitelist/{id}` — delete
+- [x] `GET /v2/ip_whitelist` — list
+- [x] `POST /v2/ip_whitelist` — add
+- [x] `PUT /v2/ip_whitelist` — update
+- [x] `DELETE /v2/ip_whitelist` — delete
 
 ---
 
