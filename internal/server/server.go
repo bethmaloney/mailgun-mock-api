@@ -14,6 +14,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/mailinglist"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
 	"github.com/bethmaloney/mailgun-mock-api/internal/route"
+	"github.com/bethmaloney/mailgun-mock-api/internal/subaccount"
 	"github.com/bethmaloney/mailgun-mock-api/internal/suppression"
 	"github.com/bethmaloney/mailgun-mock-api/internal/tag"
 	"github.com/bethmaloney/mailgun-mock-api/internal/template"
@@ -50,7 +51,8 @@ func New(db *gorm.DB) http.Handler {
 		&mailinglist.MailingList{}, &mailinglist.MailingListMember{},
 		&webhook.DomainWebhook{}, &webhook.AccountWebhook{}, &webhook.WebhookDelivery{},
 		&route.Route{},
-		&ip.IP{}, &ip.IPPool{}, &ip.IPPoolIP{}, &ip.DomainIP{}, &ip.DomainPool{})
+		&ip.IP{}, &ip.IPPool{}, &ip.IPPoolIP{}, &ip.DomainIP{}, &ip.DomainPool{},
+		&subaccount.Subaccount{}, &subaccount.SendingLimit{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -90,6 +92,9 @@ func New(db *gorm.DB) http.Handler {
 
 	// IP handlers
 	iph := ip.NewHandlers(db)
+
+	// Subaccount handlers
+	sah := subaccount.NewHandlers(db)
 
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
@@ -141,6 +146,21 @@ func New(db *gorm.DB) http.Handler {
 		r.Get("/{webhook_name}", wh.GetWebhook)
 		r.Put("/{webhook_name}", wh.UpdateWebhook)
 		r.Delete("/{webhook_name}", wh.DeleteWebhook)
+	})
+
+	// Subaccount routes
+	r.Route("/v5/accounts/subaccounts", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Post("/", sah.CreateSubaccount)
+		r.Get("/", sah.ListSubaccounts)
+		r.Delete("/", sah.DeleteSubaccount)
+		r.Get("/{subaccount_id}", sah.GetSubaccount)
+		r.Post("/{subaccount_id}/disable", sah.DisableSubaccount)
+		r.Post("/{subaccount_id}/enable", sah.EnableSubaccount)
+		r.Get("/{subaccount_id}/limit/custom/monthly", sah.GetSendingLimit)
+		r.Put("/{subaccount_id}/limit/custom/monthly", sah.SetSendingLimit)
+		r.Delete("/{subaccount_id}/limit/custom/monthly", sah.RemoveSendingLimit)
+		r.Put("/{subaccount_id}/features", sah.UpdateFeatures)
 	})
 
 	// v5 signing key routes

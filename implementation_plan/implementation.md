@@ -18,7 +18,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 9 | Webhooks | done | v3/v4/v1 APIs, delivery pipeline, signing |
 | 10 | Routes | done | CRUD, expression parser, inbound simulation |
 | 11 | IPs & IP Pools | done | Stub — static IPs, pool CRUD |
-| 12 | Subaccounts | pending | CRUD, limits, feature flags, isolation |
+| 12 | Subaccounts | done | CRUD, limits, feature flags, isolation |
 | 13 | Metrics & Analytics | pending | v3 stats, v1 metrics, usage, bounce classification |
 | 14 | Web UI — Foundation | pending | Shell, routing, dashboard |
 | 15 | Web UI — Messages & Events | pending | Message/event list and detail views |
@@ -439,24 +439,24 @@ Multi-tenancy with header-based scoping.
 > Plan doc: [subaccounts.md](./subaccounts.md)
 
 ### Subaccount CRUD
-- [ ] Model: `Subaccount` (id as 24-char hex, name, status: open/disabled/closed)
-- [ ] `GET /v5/accounts/subaccounts` — list with pagination and filters
-- [ ] `POST /v5/accounts/subaccounts` — create (accept name in both query param and form data)
-- [ ] `GET /v5/accounts/subaccounts/{id}` — get single
-- [ ] `POST /v5/accounts/subaccounts/{id}/disable` — disable
-- [ ] `POST /v5/accounts/subaccounts/{id}/enable` — enable
+- [x] Model: `Subaccount` (id as 24-char hex, name, status: open/disabled/closed)
+- [x] `GET /v5/accounts/subaccounts` — list with pagination and filters
+- [x] `POST /v5/accounts/subaccounts` — create (accept name in both query param and form data)
+- [x] `GET /v5/accounts/subaccounts/{id}` — get single
+- [x] `POST /v5/accounts/subaccounts/{id}/disable` — disable
+- [x] `POST /v5/accounts/subaccounts/{id}/enable` — enable
 
 ### Sending Limits
-- [ ] `GET /v5/accounts/subaccounts/{id}/limit/custom/monthly` — get limit
-- [ ] `POST /v5/accounts/subaccounts/{id}/limit/custom/monthly` — set limit
-- [ ] `DELETE /v5/accounts/subaccounts/{id}/limit/custom/monthly` — remove limit
+- [x] `GET /v5/accounts/subaccounts/{id}/limit/custom/monthly` — get limit
+- [x] `POST /v5/accounts/subaccounts/{id}/limit/custom/monthly` — set limit
+- [x] `DELETE /v5/accounts/subaccounts/{id}/limit/custom/monthly` — remove limit
 
 ### Feature Flags
-- [ ] `PUT /v5/accounts/subaccounts/{id}/features` — update features (`application/x-www-form-urlencoded` with JSON-stringified values)
+- [x] `PUT /v5/accounts/subaccounts/{id}/features` — update features (`application/x-www-form-urlencoded` with JSON-stringified values)
 
 ### Resource Isolation
-- [ ] Verify `X-Mailgun-On-Behalf-Of` middleware (from Phase 0) correctly scopes all resource operations
-- [ ] Test subaccount isolation across domains, messages, events, suppressions
+- [x] Verify `X-Mailgun-On-Behalf-Of` middleware (from Phase 0) correctly scopes all resource operations
+- [x] Test subaccount isolation across domains, messages, events, suppressions
 
 ---
 
