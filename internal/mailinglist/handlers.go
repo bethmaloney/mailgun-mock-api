@@ -1,8 +1,10 @@
 package mailinglist
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -776,6 +778,141 @@ func (h *Handlers) BulkAddMembers(w http.ResponseWriter, r *http.Request) {
 			ListAddress: listAddress,
 			Address:     mo.Address,
 			Name:        mo.Name,
+			Subscribed:  subscribed,
+			Vars:        varsStr,
+		}
+		h.db.Create(&member)
+		// Explicitly set subscribed field to handle gorm default:true override
+		if !subscribed {
+			h.db.Model(&member).Update("subscribed", false)
+		}
+		addedCount++
+	}
+
+	// Update members_count atomically
+	h.db.Model(&MailingList{}).Where("address = ?", listAddress).
+		Update("members_count", gorm.Expr("members_count + ?", addedCount))
+
+	// Reload list for response
+	h.db.Where("address = ?", listAddress).First(&ml)
+
+	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"list":    formatListItem(ml),
+		"message": "Mailing list has been updated",
+		"task-id": "mock-task-id",
+	})
+}
+
+// ---------------------------------------------------------------------------
+// CSV Import Members
+// ---------------------------------------------------------------------------
+
+// csvColumnIndex builds a map from lower-cased, trimmed column name to index.
+func csvColumnIndex(header []string) map[string]int {
+	idx := make(map[string]int, len(header))
+	for i, col := range header {
+		idx[strings.TrimSpace(strings.ToLower(col))] = i
+	}
+	return idx
+}
+
+// csvField retrieves a trimmed field value from a CSV record by column name.
+func csvField(record []string, colIndex map[string]int, name string) string {
+	if i, ok := colIndex[name]; ok && i < len(record) {
+		return strings.TrimSpace(record[i])
+	}
+	return ""
+}
+
+// CSVImportMembers handles POST /v3/lists/{list_address}/members.csv
+func (h *Handlers) CSVImportMembers(w http.ResponseWriter, r *http.Request) {
+	listAddress := chi.URLParam(r, "list_address")
+
+	var ml MailingList
+	if err := h.db.Where("address = ?", listAddress).First(&ml).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, fmt.Sprintf("Mailing list %s not found", listAddress))
+		return
+	}
+
+	// Read the CSV file from the "members" form field
+	file, _, err := r.FormFile("members")
+	if err != nil {
+		response.RespondError(w, http.StatusBadRequest, "file is required")
+		return
+	}
+	defer file.Close()
+
+	// Parse upsert form field (default false)
+	upsert := false
+	if r.FormValue("upsert") != "" {
+		upsert = parseBool(r.FormValue("upsert"))
+	}
+
+	// Parse default subscribed from form field
+	defaultSubscribed := true
+	hasDefaultSubscribed := false
+	if subVal := r.FormValue("subscribed"); subVal != "" {
+		defaultSubscribed = parseBool(subVal)
+		hasDefaultSubscribed = true
+	}
+
+	reader := csv.NewReader(file)
+
+	header, err := reader.Read()
+	if err != nil {
+		response.RespondError(w, http.StatusBadRequest, "failed to read CSV header")
+		return
+	}
+	colIndex := csvColumnIndex(header)
+
+	addedCount := 0
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			continue
+		}
+
+		address := csvField(record, colIndex, "address")
+		if address == "" {
+			continue
+		}
+
+		name := csvField(record, colIndex, "name")
+		varsStr := csvField(record, colIndex, "vars")
+
+		// Determine subscribed value: row > form field > default true
+		subscribed := true
+		rowSubscribed := csvField(record, colIndex, "subscribed")
+		if rowSubscribed != "" {
+			subscribed = parseBool(rowSubscribed)
+		} else if hasDefaultSubscribed {
+			subscribed = defaultSubscribed
+		}
+
+		// Check if member already exists
+		var existing MailingListMember
+		memberExists := h.db.Where("list_address = ? AND address = ?", listAddress, address).First(&existing).Error == nil
+
+		if memberExists {
+			if upsert {
+				existing.Name = name
+				existing.Subscribed = subscribed
+				if varsStr != "" {
+					existing.Vars = varsStr
+				}
+				h.db.Save(&existing)
+			}
+			// If not upsert and exists, skip silently for bulk operations
+			continue
+		}
+
+		member := MailingListMember{
+			ListAddress: listAddress,
+			Address:     address,
+			Name:        name,
 			Subscribed:  subscribed,
 			Vars:        varsStr,
 		}

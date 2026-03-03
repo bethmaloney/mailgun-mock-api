@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/mail"
 	"path/filepath"
 	"strings"
 	"time"
@@ -328,7 +329,8 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Generate events for each recipient
 	if h.eventHandlers != nil {
 		recipients := parseRecipients(to)
-		for _, recipient := range recipients {
+		expandedRecipients := h.expandMailingLists(recipients)
+		for _, recipient := range expandedRecipients {
 			_ = h.eventHandlers.GenerateAcceptedEvent(
 				domainName, messageID, storageKey, from, recipient, subject,
 				tagsJSON, string(customVariablesJSON),
@@ -443,6 +445,58 @@ func (h *Handlers) resolveTemplate(domainName, templateField, versionTag, templa
 	}
 
 	return result, ""
+}
+
+// mailingListLookup is a minimal struct used to query the mailing_lists table
+// without importing the mailinglist package (avoiding circular imports).
+type mailingListLookup struct {
+	Address string
+}
+
+func (mailingListLookup) TableName() string { return "mailing_lists" }
+
+// mailingListMemberLookup is a minimal struct used to query the mailing_list_members table
+// without importing the mailinglist package (avoiding circular imports).
+type mailingListMemberLookup struct {
+	Address    string
+	Name       string
+	Subscribed bool
+	Vars       string
+}
+
+func (mailingListMemberLookup) TableName() string { return "mailing_list_members" }
+
+// extractEmail extracts the bare email address from a string that may include
+// a display name (e.g. "Alice <alice@example.com>"). If parsing fails, the
+// original string is returned as-is.
+func extractEmail(addr string) string {
+	if parsed, err := mail.ParseAddress(addr); err == nil {
+		return parsed.Address
+	}
+	return addr
+}
+
+// expandMailingLists checks each recipient against the mailing_lists table.
+// If a recipient matches a mailing list address, it is replaced with all
+// subscribed members of that list. Non-list addresses pass through unchanged.
+func (h *Handlers) expandMailingLists(recipients []string) []string {
+	var expanded []string
+	for _, recipient := range recipients {
+		bareEmail := extractEmail(recipient)
+		var ml mailingListLookup
+		if err := h.db.Where("address = ?", bareEmail).First(&ml).Error; err != nil {
+			// Not a mailing list — keep as-is
+			expanded = append(expanded, recipient)
+			continue
+		}
+		// It's a mailing list — look up subscribed members
+		var members []mailingListMemberLookup
+		h.db.Where("list_address = ? AND subscribed = ?", bareEmail, true).Find(&members)
+		for _, m := range members {
+			expanded = append(expanded, m.Address)
+		}
+	}
+	return expanded
 }
 
 // parseRecipients splits a comma-separated list of email addresses and trims whitespace.

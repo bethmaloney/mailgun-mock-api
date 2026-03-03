@@ -97,8 +97,10 @@ type Handlers struct {
 	config *mock.MockConfig
 }
 
-// NewHandlers creates a new Handlers instance.
+// NewHandlers creates a new Handlers instance. It resets event data in the
+// database to ensure a clean state for the mock server.
 func NewHandlers(db *gorm.DB, config *mock.MockConfig) *Handlers {
+	db.Unscoped().Where("1 = 1").Delete(&Event{})
 	return &Handlers{db: db, config: config}
 }
 

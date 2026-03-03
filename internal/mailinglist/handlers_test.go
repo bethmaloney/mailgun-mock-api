@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -133,6 +134,7 @@ func setupRouter(db *gorm.DB) http.Handler {
 
 		// Bulk
 		r.Post("/{list_address}/members.json", h.BulkAddMembers)
+		r.Post("/{list_address}/members.csv", h.CSVImportMembers)
 	})
 
 	return r
@@ -1899,5 +1901,485 @@ func TestListMembers_CursorBased_SubscribedFalseFilter(t *testing.T) {
 	}
 	if resp.Items[0].Subscribed {
 		t.Error("expected member to be unsubscribed")
+	}
+}
+
+// =========================================================================
+// CSV Import Tests
+// =========================================================================
+
+// newCSVImportRequest creates a multipart/form-data request with a CSV file
+// uploaded in the "members" file field, plus optional extra form fields.
+func newCSVImportRequest(t *testing.T, url string, csvContent string, fields map[string]string) *http.Request {
+	t.Helper()
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	// Add file field
+	part, err := writer.CreateFormFile("members", "members.csv")
+	if err != nil {
+		t.Fatalf("failed to create form file: %v", err)
+	}
+	if _, err := io.Copy(part, bytes.NewReader([]byte(csvContent))); err != nil {
+		t.Fatalf("failed to write CSV content: %v", err)
+	}
+
+	// Add other fields
+	for key, val := range fields {
+		if err := writer.WriteField(key, val); err != nil {
+			t.Fatalf("failed to write field %q: %v", key, err)
+		}
+	}
+	writer.Close()
+
+	req := httptest.NewRequest("POST", url, &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req
+}
+
+// doCSVImport creates the CSV import request and sends it through the router.
+func doCSVImport(t *testing.T, router http.Handler, listAddr, csvContent string, fields map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	url := fmt.Sprintf("/v3/lists/%s/members.csv", listAddr)
+	req := newCSVImportRequest(t, url, csvContent, fields)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+// ---------------------------------------------------------------------------
+// 31. Basic CSV import with address and name columns
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_BasicAddressAndName(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	csv := "address,name\nalice@example.com,Alice\nbob@example.com,Bob\n"
+
+	rec := doCSVImport(t, router, "devs@example.com", csv, nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var resp bulkAddResponse
+	decodeJSON(t, rec, &resp)
+
+	if resp.Message != "Mailing list has been updated" {
+		t.Errorf("expected message %q, got %q", "Mailing list has been updated", resp.Message)
+	}
+	if resp.TaskID == "" {
+		t.Error("expected non-empty task-id")
+	}
+	if resp.List.Address != "devs@example.com" {
+		t.Errorf("expected list address %q, got %q", "devs@example.com", resp.List.Address)
+	}
+
+	// Verify alice was added
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/alice@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var aliceResp memberResponse
+	decodeJSON(t, rec, &aliceResp)
+
+	if aliceResp.Member.Address != "alice@example.com" {
+		t.Errorf("expected address %q, got %q", "alice@example.com", aliceResp.Member.Address)
+	}
+	if aliceResp.Member.Name != "Alice" {
+		t.Errorf("expected name %q, got %q", "Alice", aliceResp.Member.Name)
+	}
+
+	// Verify bob was added
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/bob@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var bobResp memberResponse
+	decodeJSON(t, rec, &bobResp)
+
+	if bobResp.Member.Name != "Bob" {
+		t.Errorf("expected name %q, got %q", "Bob", bobResp.Member.Name)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 32. CSV import with all columns (address, name, subscribed, vars)
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_AllColumns(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	csv := "address,name,subscribed,vars\n" +
+		"alice@example.com,Alice,true,\"{\"\"role\"\":\"\"admin\"\"}\"\n" +
+		"bob@example.com,Bob,false,\"{\"\"role\"\":\"\"user\"\"}\"\n"
+
+	rec := doCSVImport(t, router, "devs@example.com", csv, nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var resp bulkAddResponse
+	decodeJSON(t, rec, &resp)
+
+	if resp.Message != "Mailing list has been updated" {
+		t.Errorf("expected message %q, got %q", "Mailing list has been updated", resp.Message)
+	}
+
+	// Verify alice
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/alice@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var aliceResp memberResponse
+	decodeJSON(t, rec, &aliceResp)
+
+	if !aliceResp.Member.Subscribed {
+		t.Error("expected alice to be subscribed")
+	}
+	if role, ok := aliceResp.Member.Vars["role"].(string); !ok || role != "admin" {
+		t.Errorf("expected alice vars.role %q, got %v", "admin", aliceResp.Member.Vars["role"])
+	}
+
+	// Verify bob
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/bob@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var bobResp memberResponse
+	decodeJSON(t, rec, &bobResp)
+
+	if bobResp.Member.Subscribed {
+		t.Error("expected bob to be unsubscribed")
+	}
+	if role, ok := bobResp.Member.Vars["role"].(string); !ok || role != "user" {
+		t.Errorf("expected bob vars.role %q, got %v", "user", bobResp.Member.Vars["role"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 33. CSV import with only address column
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_OnlyAddressColumn(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	csv := "address\nalice@example.com\nbob@example.com\n"
+
+	rec := doCSVImport(t, router, "devs@example.com", csv, nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var resp bulkAddResponse
+	decodeJSON(t, rec, &resp)
+
+	if resp.Message != "Mailing list has been updated" {
+		t.Errorf("expected message %q, got %q", "Mailing list has been updated", resp.Message)
+	}
+
+	// Verify both members were added with defaults
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/alice@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var aliceResp memberResponse
+	decodeJSON(t, rec, &aliceResp)
+
+	if aliceResp.Member.Address != "alice@example.com" {
+		t.Errorf("expected address %q, got %q", "alice@example.com", aliceResp.Member.Address)
+	}
+	// Default subscribed should be true
+	if !aliceResp.Member.Subscribed {
+		t.Error("expected default subscribed to be true")
+	}
+	// Name should be empty
+	if aliceResp.Member.Name != "" {
+		t.Errorf("expected empty name, got %q", aliceResp.Member.Name)
+	}
+
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/bob@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+}
+
+// ---------------------------------------------------------------------------
+// 34. CSV import with upsert=true updates existing members
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_UpsertTrue(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	// Add alice with original name
+	addMemberOK(t, router, "devs@example.com", map[string]string{
+		"address": "alice@example.com",
+		"name":    "Alice Original",
+	})
+
+	// CSV import with upsert=true should update alice and add bob
+	csv := "address,name\nalice@example.com,Alice Updated\nbob@example.com,Bob New\n"
+
+	rec := doCSVImport(t, router, "devs@example.com", csv, map[string]string{
+		"upsert": "true",
+	})
+	assertStatus(t, rec, http.StatusOK)
+
+	// Verify alice was updated
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/alice@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var aliceResp memberResponse
+	decodeJSON(t, rec, &aliceResp)
+
+	if aliceResp.Member.Name != "Alice Updated" {
+		t.Errorf("expected name %q after upsert, got %q", "Alice Updated", aliceResp.Member.Name)
+	}
+
+	// Verify bob was added
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/bob@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var bobResp memberResponse
+	decodeJSON(t, rec, &bobResp)
+
+	if bobResp.Member.Name != "Bob New" {
+		t.Errorf("expected name %q, got %q", "Bob New", bobResp.Member.Name)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 35. CSV import with upsert=false skips existing members silently
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_UpsertFalse_SkipsExisting(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	// Add alice with original name
+	addMemberOK(t, router, "devs@example.com", map[string]string{
+		"address": "alice@example.com",
+		"name":    "Alice Original",
+	})
+
+	// CSV import without upsert (default false) should skip alice, add bob
+	csv := "address,name\nalice@example.com,Alice Should Not Change\nbob@example.com,Bob New\n"
+
+	rec := doCSVImport(t, router, "devs@example.com", csv, nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	// Verify alice was NOT updated (bulk operations skip silently)
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/alice@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var aliceResp memberResponse
+	decodeJSON(t, rec, &aliceResp)
+
+	if aliceResp.Member.Name != "Alice Original" {
+		t.Errorf("expected name %q (unchanged), got %q", "Alice Original", aliceResp.Member.Name)
+	}
+
+	// Verify bob was added
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/bob@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+}
+
+// ---------------------------------------------------------------------------
+// 36. CSV import to non-existent list returns 404
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_ListNotFound(t *testing.T) {
+	router := setup(t)
+
+	csv := "address,name\nalice@example.com,Alice\n"
+
+	rec := doCSVImport(t, router, "nonexistent@example.com", csv, nil)
+	assertStatus(t, rec, http.StatusNotFound)
+
+	var resp messageResponse
+	decodeJSON(t, rec, &resp)
+
+	if resp.Message == "" {
+		t.Error("expected non-empty error message for not found list")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 37. CSV import with no file returns 400
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_NoFile(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	// Send a regular multipart request without any file field
+	rec := doRequest(t, router, "POST", "/v3/lists/devs@example.com/members.csv", map[string]string{
+		"upsert": "true",
+	})
+	assertStatus(t, rec, http.StatusBadRequest)
+
+	var resp messageResponse
+	decodeJSON(t, rec, &resp)
+
+	if resp.Message != "file is required" {
+		t.Errorf("expected message %q, got %q", "file is required", resp.Message)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 38. CSV import correctly updates members_count
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_UpdatesMembersCount(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	csv := "address,name\nalice@example.com,Alice\nbob@example.com,Bob\ncharlie@example.com,Charlie\n"
+
+	rec := doCSVImport(t, router, "devs@example.com", csv, nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var resp bulkAddResponse
+	decodeJSON(t, rec, &resp)
+
+	// The response should include the updated members_count
+	if resp.List.MembersCount != 3 {
+		t.Errorf("expected members_count 3 in response, got %d", resp.List.MembersCount)
+	}
+
+	// Also verify via GET
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var listResp listResponse
+	decodeJSON(t, rec, &listResp)
+
+	if listResp.List.MembersCount != 3 {
+		t.Errorf("expected members_count 3 via GET, got %d", listResp.List.MembersCount)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 38b. CSV import with existing members: count only increments for new members
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_MembersCountOnlyCountsNew(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	// Add alice first
+	addMemberOK(t, router, "devs@example.com", map[string]string{
+		"address": "alice@example.com",
+	})
+
+	// CSV import includes alice (existing) and bob (new), no upsert
+	csv := "address,name\nalice@example.com,Alice\nbob@example.com,Bob\n"
+
+	rec := doCSVImport(t, router, "devs@example.com", csv, nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var resp bulkAddResponse
+	decodeJSON(t, rec, &resp)
+
+	// Should be 2 total: 1 existing + 1 newly added
+	if resp.List.MembersCount != 2 {
+		t.Errorf("expected members_count 2, got %d", resp.List.MembersCount)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 39. CSV import with subscribed form field sets default subscription status
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_SubscribedFormFieldDefault(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	// CSV has no subscribed column; the form field "subscribed" should set the default
+	csv := "address,name\nalice@example.com,Alice\nbob@example.com,Bob\n"
+
+	rec := doCSVImport(t, router, "devs@example.com", csv, map[string]string{
+		"subscribed": "false",
+	})
+	assertStatus(t, rec, http.StatusOK)
+
+	// Verify both members are unsubscribed (inheriting the form field default)
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/alice@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var aliceResp memberResponse
+	decodeJSON(t, rec, &aliceResp)
+
+	if aliceResp.Member.Subscribed {
+		t.Error("expected alice to be unsubscribed (from form field default)")
+	}
+
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/bob@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var bobResp memberResponse
+	decodeJSON(t, rec, &bobResp)
+
+	if bobResp.Member.Subscribed {
+		t.Error("expected bob to be unsubscribed (from form field default)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 39b. CSV row subscribed column overrides form field default
+// ---------------------------------------------------------------------------
+
+func TestCSVImport_RowSubscribedOverridesDefault(t *testing.T) {
+	router := setup(t)
+
+	createListOK(t, router, map[string]string{
+		"address": "devs@example.com",
+	})
+
+	// Form field says subscribed=false, but CSV row says subscribed=true for alice
+	csv := "address,name,subscribed\nalice@example.com,Alice,true\nbob@example.com,Bob,\n"
+
+	rec := doCSVImport(t, router, "devs@example.com", csv, map[string]string{
+		"subscribed": "false",
+	})
+	assertStatus(t, rec, http.StatusOK)
+
+	// alice should be subscribed (row overrides form default)
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/alice@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var aliceResp memberResponse
+	decodeJSON(t, rec, &aliceResp)
+
+	if !aliceResp.Member.Subscribed {
+		t.Error("expected alice to be subscribed (row subscribed=true overrides form default)")
+	}
+
+	// bob should be unsubscribed (empty row value, uses form default)
+	rec = doRequest(t, router, "GET", "/v3/lists/devs@example.com/members/bob@example.com", nil)
+	assertStatus(t, rec, http.StatusOK)
+
+	var bobResp memberResponse
+	decodeJSON(t, rec, &bobResp)
+
+	if bobResp.Member.Subscribed {
+		t.Error("expected bob to be unsubscribed (empty row value, form default=false)")
 	}
 }

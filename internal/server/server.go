@@ -247,6 +247,7 @@ func New(db *gorm.DB) http.Handler {
 		r.Put("/{list_address}/members/{member_address}", mlh.UpdateMember)
 		r.Delete("/{list_address}/members/{member_address}", mlh.DeleteMember)
 		r.Post("/{list_address}/members.json", mlh.BulkAddMembers)
+		r.Post("/{list_address}/members.csv", mlh.CSVImportMembers)
 	})
 
 	// API Key routes

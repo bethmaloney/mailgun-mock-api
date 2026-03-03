@@ -14,7 +14,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 5 | Suppressions | done | Bounces, complaints, unsubscribes, allowlist |
 | 6 | Templates | done | CRUD, versioning, Handlebars rendering |
 | 7 | Tags & Stats | done | Auto-creation, time-series stats, v1 stubs, singular path support |
-| 8 | Mailing Lists | in progress | List/member CRUD, bulk ops, send integration |
+| 8 | Mailing Lists | done | List/member CRUD, bulk ops, send integration |
 | 9 | Webhooks | pending | v3/v4/v1 APIs, delivery pipeline, signing |
 | 10 | Routes | pending | CRUD, expression parser, inbound simulation |
 | 11 | IPs & IP Pools | pending | Stub — static IPs, pool CRUD |
@@ -327,13 +327,13 @@ List and member CRUD with bulk operations.
 
 ### Bulk Operations
 - [x] `POST /v3/lists/{address}/members.json` — bulk add/upsert via JSON array
-- [ ] `POST /v3/lists/{address}/members/import` — CSV import
+- [x] `POST /v3/lists/{address}/members/import` — CSV import
 - [x] Track `members_count` on list model (increment/decrement on member changes)
 
 ### List Sending Integration
-- [ ] Expand list address to members on message send
-- [ ] Substitute `%recipient.varname%` from member `vars`
-- [ ] Generate `%mailing_list_unsubscribe_url%` pointing back to mock
+- [x] Expand list address to members on message send
+- [x] Substitute `%recipient.varname%` from member `vars`
+- [x] Generate `%mailing_list_unsubscribe_url%` pointing back to mock
 
 ---
 
