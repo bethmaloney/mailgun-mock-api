@@ -12,7 +12,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 3 | Messages & Storage | done | Send, store, retrieve, resend |
 | 4 | Events & Logs | done | Generation pipeline, querying, mock triggers |
 | 5 | Suppressions | done | Bounces, complaints, unsubscribes, allowlist |
-| 6 | Templates | in progress | CRUD, versioning, Handlebars rendering |
+| 6 | Templates | done | CRUD, versioning, Handlebars rendering |
 | 7 | Tags & Stats | in progress | Auto-creation, time-series stats, v1 stubs |
 | 8 | Mailing Lists | in progress | List/member CRUD, bulk ops, send integration |
 | 9 | Webhooks | pending | v3/v4/v1 APIs, delivery pipeline, signing |
@@ -259,10 +259,10 @@ Server-side templates with versioning and rendering.
 - [x] `PUT /v3/{domain}/templates/{name}/versions/{tag}/copy/{new_tag}` — copy version
 
 ### Template Rendering
-- [ ] Integrate Handlebars rendering (Go library) with custom `equal` helper
-- [ ] Resolve `t:template` / `template` param at message send time
-- [ ] Substitute `recipient-variables` and `v:*` custom variables into template
-- [ ] Inject `t:headers` as additional message headers
+- [x] Integrate Handlebars rendering (Go library) with custom `equal` helper
+- [x] Resolve `t:template` / `template` param at message send time
+- [x] Substitute `recipient-variables` and `v:*` custom variables into template
+- [x] Inject `t:headers` as additional message headers
 
 ---
 

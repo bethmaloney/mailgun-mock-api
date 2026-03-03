@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -28,6 +29,30 @@ type domainLookup struct {
 }
 
 func (domainLookup) TableName() string { return "domains" }
+
+// templateLookup is a minimal struct used to query the templates table
+// without importing the template package (avoiding circular imports).
+type templateLookup struct {
+	ID         string
+	DomainName string
+	Name       string
+}
+
+func (templateLookup) TableName() string { return "templates" }
+
+// templateVersionLookup is a minimal struct used to query the template_versions table
+// without importing the template package (avoiding circular imports).
+type templateVersionLookup struct {
+	ID         string
+	TemplateID string
+	Tag        string
+	Template   string // the Handlebars content
+	Engine     string
+	Active     bool
+	Headers    string // JSON-encoded headers
+}
+
+func (templateVersionLookup) TableName() string { return "template_versions" }
 
 // StoredMessage represents a message stored in the database after being sent
 // via the Mailgun API.
@@ -192,6 +217,36 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Check test mode
 	testMode := r.FormValue("o:testmode") == "yes"
 
+	// Template resolution: if a template name is provided, look it up, find
+	// the correct version, render variables, and apply template headers.
+	if template != "" {
+		result, errMsg := h.resolveTemplate(domainName, template, templateVersion, templateVariables, customVariables)
+		if errMsg != "" {
+			response.RespondError(w, http.StatusBadRequest, errMsg)
+			return
+		}
+		if result != nil {
+			html = result.renderedHTML
+			if subject == "" && result.subject != "" {
+				subject = result.subject
+			}
+			if result.replyTo != "" {
+				if _, exists := customHeaders["Reply-To"]; !exists {
+					customHeaders["Reply-To"] = result.replyTo
+				}
+			}
+			templateVersion = result.versionTag
+
+			// Handle t:text=yes — generate plain text from rendered HTML
+			if r.FormValue("t:text") == "yes" && text == "" {
+				text = stripHTMLTags(html)
+			}
+
+			// Re-marshal customHeaders since we may have added Reply-To
+			customHeadersJSON, _ = json.Marshal(customHeaders)
+		}
+	}
+
 	// Generate message ID and storage key
 	messageID, storageKey := generateMessageID(domainName)
 
@@ -300,6 +355,94 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		"id":      messageID,
 		"message": "Queued. Thank you.",
 	})
+}
+
+// templateRenderResult holds the output of template resolution and rendering.
+type templateRenderResult struct {
+	renderedHTML string
+	subject      string
+	from         string
+	replyTo      string
+	versionTag   string
+}
+
+// resolveTemplate looks up a template by name within a domain, finds the
+// appropriate version, renders the content with variables, and extracts
+// template headers. It returns (result, "") on success, (nil, "") if the
+// templates table doesn't exist (graceful skip), or (nil, errorMessage) on
+// a user-facing error (template not found, version not found, etc.).
+func (h *Handlers) resolveTemplate(domainName, templateField, versionTag, templateVariablesJSON string, customVariables map[string]string) (*templateRenderResult, string) {
+	templateName := strings.ToLower(templateField)
+
+	// Look up template by domain and name
+	var tmpl templateLookup
+	if err := h.db.Where("domain_name = ? AND name = ?", domainName, templateName).First(&tmpl).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Sprintf("template '%s' not found", templateName)
+		}
+		// Table may not exist (e.g. test setups without template migration) — skip gracefully
+		return nil, ""
+	}
+
+	// Find the version: use specified tag or the active version
+	var ver templateVersionLookup
+	if versionTag != "" {
+		if err := h.db.Where("template_id = ? AND tag = ?", tmpl.ID, versionTag).First(&ver).Error; err != nil {
+			return nil, fmt.Sprintf("version '%s' not found for template '%s'", versionTag, templateName)
+		}
+	} else {
+		if err := h.db.Where("template_id = ? AND active = ?", tmpl.ID, true).First(&ver).Error; err != nil {
+			return nil, fmt.Sprintf("no active version found for template '%s'", templateName)
+		}
+	}
+
+	// Merge variables: start with v:* custom vars, then overlay t:variables (takes precedence)
+	vars := make(map[string]interface{})
+	for k, v := range customVariables {
+		vars[k] = v
+	}
+	if templateVariablesJSON != "" {
+		var tvars map[string]interface{}
+		if err := json.Unmarshal([]byte(templateVariablesJSON), &tvars); err == nil {
+			for k, v := range tvars {
+				vars[k] = v
+			}
+		}
+	}
+
+	// Render the template content with variables
+	renderedHTML, err := renderTemplate(ver.Template, vars)
+	if err != nil {
+		return nil, fmt.Sprintf("failed to render template '%s': %s", templateName, err.Error())
+	}
+
+	result := &templateRenderResult{
+		renderedHTML: renderedHTML,
+		versionTag:   ver.Tag,
+	}
+
+	// Extract template headers
+	if ver.Headers != "" {
+		var headers map[string]string
+		if err := json.Unmarshal([]byte(ver.Headers), &headers); err == nil {
+			if subj, ok := headers["Subject"]; ok {
+				// Also render the subject with variables
+				if renderedSubj, renderErr := renderTemplate(subj, vars); renderErr == nil {
+					result.subject = renderedSubj
+				} else {
+					result.subject = subj
+				}
+			}
+			if fromHeader, ok := headers["From"]; ok {
+				result.from = fromHeader
+			}
+			if replyTo, ok := headers["Reply-To"]; ok {
+				result.replyTo = replyTo
+			}
+		}
+	}
+
+	return result, ""
 }
 
 // parseRecipients splits a comma-separated list of email addresses and trims whitespace.
