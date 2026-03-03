@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bethmaloney/mailgun-mock-api/internal/database"
+	"github.com/bethmaloney/mailgun-mock-api/internal/event"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
 	"github.com/go-chi/chi/v5"
@@ -54,13 +55,26 @@ type StoredMessage struct {
 
 // Handlers holds the database connection and mock configuration for message endpoints.
 type Handlers struct {
-	db     *gorm.DB
-	config *mock.MockConfig
+	db            *gorm.DB
+	config        *mock.MockConfig
+	eventHandlers *event.Handlers
 }
 
-// NewHandlers creates a new Handlers instance.
+// NewHandlers creates a new Handlers instance. Event handlers are automatically
+// created using the same db and config so that event generation works without
+// requiring an explicit SetEventHandlers call.
 func NewHandlers(db *gorm.DB, config *mock.MockConfig) *Handlers {
-	return &Handlers{db: db, config: config}
+	return &Handlers{
+		db:            db,
+		config:        config,
+		eventHandlers: event.NewHandlers(db, config),
+	}
+}
+
+// SetEventHandlers sets the event handlers used for event generation when
+// messages are sent. This allows sharing event handlers with the server.
+func (h *Handlers) SetEventHandlers(eh *event.Handlers) {
+	h.eventHandlers = eh
 }
 
 // generateMessageID creates a message ID in the format <timestamp.hexrandom@domain>.
@@ -206,10 +220,41 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate events for each recipient
+	if h.eventHandlers != nil {
+		recipients := parseRecipients(to)
+		for _, recipient := range recipients {
+			_ = h.eventHandlers.GenerateAcceptedEvent(
+				domainName, messageID, storageKey, from, recipient, subject,
+				tagsJSON, string(customVariablesJSON),
+			)
+
+			if h.config != nil && h.config.EventGeneration.AutoDeliver && h.config.EventGeneration.DeliveryDelayMs == 0 {
+				_ = h.eventHandlers.GenerateDeliveryEvent(
+					domainName, messageID, storageKey, from, recipient, subject,
+					tagsJSON, string(customVariablesJSON),
+				)
+			}
+		}
+	}
+
 	response.RespondJSON(w, http.StatusOK, map[string]string{
 		"id":      messageID,
 		"message": "Queued. Thank you.",
 	})
+}
+
+// parseRecipients splits a comma-separated list of email addresses and trims whitespace.
+func parseRecipients(to string) []string {
+	parts := strings.Split(to, ",")
+	var recipients []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			recipients = append(recipients, p)
+		}
+	}
+	return recipients
 }
 
 // GetMessage handles GET /v3/domains/{domain_name}/messages/{storage_key}.

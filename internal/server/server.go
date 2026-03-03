@@ -9,6 +9,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/apikey"
 	"github.com/bethmaloney/mailgun-mock-api/internal/credential"
 	"github.com/bethmaloney/mailgun-mock-api/internal/domain"
+	"github.com/bethmaloney/mailgun-mock-api/internal/event"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
 	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
@@ -35,7 +36,7 @@ func New(db *gorm.DB) http.Handler {
 	}))
 
 	// Run model migrations.
-	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{})
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &event.Event{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -52,8 +53,12 @@ func New(db *gorm.DB) http.Handler {
 	// IP Allowlist handlers
 	ah := allowlist.NewHandlers(db)
 
+	// Event handlers
+	eh := event.NewHandlers(db, h.Config())
+
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
+	mh.SetEventHandlers(eh)
 
 	r.Route("/v4/domains", func(r chi.Router) {
 		r.Use(appMiddleware.BasicAuth(h.Config()))
@@ -89,6 +94,9 @@ func New(db *gorm.DB) http.Handler {
 		r.Use(appMiddleware.BasicAuth(h.Config()))
 		r.Post("/", mh.SendMessage)
 	})
+
+	// Events route
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/events", eh.ListEvents)
 
 	// MIME message sending route
 	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v3/{domain_name}/messages.mime", mh.SendMIMEMessage)

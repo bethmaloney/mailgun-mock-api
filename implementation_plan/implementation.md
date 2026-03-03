@@ -10,7 +10,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 1 | Domains | done | CRUD, verification, tracking, connection settings |
 | 2 | Credentials & Keys | done | SMTP creds, API keys, IP allowlist |
 | 3 | Messages & Storage | in progress | Send, store, retrieve, resend |
-| 4 | Events & Logs | pending | Generation pipeline, querying, mock triggers |
+| 4 | Events & Logs | in progress | Generation pipeline, querying, mock triggers |
 | 5 | Suppressions | pending | Bounces, complaints, unsubscribes, allowlist |
 | 6 | Templates | pending | CRUD, versioning, Handlebars rendering |
 | 7 | Tags & Stats | pending | Auto-creation, time-series stats, v1 stubs |
@@ -173,22 +173,22 @@ Event generation pipeline — produces events for every message lifecycle transi
 > Plan doc: [events-and-logs.md](./events-and-logs.md)
 
 ### Event Generation
-- [ ] Model: `Event` with type, timestamp (microsecond precision), message headers, tags, recipient, delivery-status, etc.
-- [ ] Generate `accepted` event per recipient on message send
-- [ ] Auto-generate delivery events based on mock config mode:
+- [x] Model: `Event` with type, timestamp (microsecond precision), message headers, tags, recipient, delivery-status, etc.
+- [x] Generate `accepted` event per recipient on message send
+- [x] Auto-generate delivery events based on mock config mode:
   - `immediate`: generate `delivered` (or `failed`) synchronously on send
   - `delayed`: generate after configurable delay
   - `manual`: only via mock trigger endpoints
 - [ ] Check suppression lists before generating `delivered` — produce `failed` with reason if suppressed
-- [ ] Generate unique event IDs and realistic `log-level`, `delivery-status` fields
+- [x] Generate unique event IDs and realistic `log-level`, `delivery-status` fields
 
 ### Event Querying
-- [ ] `GET /v3/{domain}/events` — list with opaque URL-based pagination
-- [ ] Filter support: `event` type, `recipient`, `from`, `subject`, `tags`, `severity`, `message-id`
-- [ ] Time range: `begin`, `end` (RFC 2822, Unix epoch, or shorthand)
-- [ ] AND/OR/NOT filter expressions on `event` param
-- [ ] Ascending/descending order
-- [ ] Generate opaque `next`/`previous` page URLs
+- [x] `GET /v3/{domain}/events` — list with opaque URL-based pagination
+- [x] Filter support: `event` type, `recipient`, `from`, `subject`, `tags`, `severity`, `message-id`
+- [x] Time range: `begin`, `end` (RFC 2822, Unix epoch, or shorthand)
+- [x] AND/OR/NOT filter expressions on `event` param
+- [x] Ascending/descending order
+- [x] Generate opaque `next`/`previous` page URLs
 
 ### Mock Event Triggers
 - [ ] `POST /mock/events/{domain}/deliver/{message_id}` — trigger delivered event
