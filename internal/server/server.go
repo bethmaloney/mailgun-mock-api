@@ -12,6 +12,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/event"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mailinglist"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
+	"github.com/bethmaloney/mailgun-mock-api/internal/route"
 	"github.com/bethmaloney/mailgun-mock-api/internal/suppression"
 	"github.com/bethmaloney/mailgun-mock-api/internal/tag"
 	"github.com/bethmaloney/mailgun-mock-api/internal/template"
@@ -46,7 +47,8 @@ func New(db *gorm.DB) http.Handler {
 		&template.Template{}, &template.TemplateVersion{},
 		&tag.Tag{},
 		&mailinglist.MailingList{}, &mailinglist.MailingListMember{},
-		&webhook.DomainWebhook{}, &webhook.AccountWebhook{}, &webhook.WebhookDelivery{})
+		&webhook.DomainWebhook{}, &webhook.AccountWebhook{}, &webhook.WebhookDelivery{},
+		&route.Route{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -80,6 +82,9 @@ func New(db *gorm.DB) http.Handler {
 
 	// Webhook handlers
 	wh := webhook.NewHandlers(db, h.Config())
+
+	// Route handlers
+	rth := route.NewHandlers(db)
 
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
@@ -141,6 +146,17 @@ func New(db *gorm.DB) http.Handler {
 		r.Get("/{webhook_id}", wh.GetAccountWebhook)
 		r.Put("/{webhook_id}", wh.UpdateAccountWebhook)
 		r.Delete("/{webhook_id}", wh.DeleteAccountWebhook)
+	})
+
+	// Route CRUD (account-level, not domain-scoped)
+	r.Route("/v3/routes", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Post("/", rth.CreateRoute)
+		r.Get("/", rth.ListRoutes)
+		r.Get("/match", rth.MatchRoute)
+		r.Get("/{route_id}", rth.GetRoute)
+		r.Put("/{route_id}", rth.UpdateRoute)
+		r.Delete("/{route_id}", rth.DeleteRoute)
 	})
 
 	// Message sending route
@@ -315,6 +331,8 @@ func New(db *gorm.DB) http.Handler {
 		// so that chi matches the static path before the wildcard.
 		r.Post("/reset/messages", h.ResetMessages)
 		r.Post("/reset/{domain}", h.ResetDomain)
+		// Mock inbound simulation
+		r.Post("/inbound/{domain}", rth.SimulateInbound)
 		// Mock webhook inspection
 		r.Get("/webhooks/deliveries", wh.ListDeliveries)
 		r.Post("/webhooks/trigger", wh.TriggerWebhook)

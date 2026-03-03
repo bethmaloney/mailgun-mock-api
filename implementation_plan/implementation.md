@@ -16,7 +16,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 7 | Tags & Stats | done | Auto-creation, time-series stats, v1 stubs, singular path support |
 | 8 | Mailing Lists | done | List/member CRUD, bulk ops, send integration |
 | 9 | Webhooks | done | v3/v4/v1 APIs, delivery pipeline, signing |
-| 10 | Routes | pending | CRUD, expression parser, inbound simulation |
+| 10 | Routes | done | CRUD, expression parser, inbound simulation |
 | 11 | IPs & IP Pools | pending | Stub — static IPs, pool CRUD |
 | 12 | Subaccounts | pending | CRUD, limits, feature flags, isolation |
 | 13 | Metrics & Analytics | pending | v3 stats, v1 metrics, usage, bounce classification |
@@ -386,25 +386,25 @@ Account-level inbound email routing.
 > Plan doc: [routes.md](./routes.md)
 
 ### Route CRUD
-- [ ] Model: `Route` (id as 24-char hex, priority, description, expression, actions[], created_at)
-- [ ] `GET /v3/routes` — list with skip/limit pagination
-- [ ] `GET /v3/routes/{id}` — get single
-- [ ] `POST /v3/routes` — create with expression + actions
-- [ ] `PUT /v3/routes/{id}` — update
-- [ ] `DELETE /v3/routes/{id}` — delete
+- [x] Model: `Route` (id as 24-char hex, priority, description, expression, actions[], created_at)
+- [x] `GET /v3/routes` — list with skip/limit pagination
+- [x] `GET /v3/routes/{id}` — get single
+- [x] `POST /v3/routes` — create with expression + actions
+- [x] `PUT /v3/routes/{id}` — update
+- [x] `DELETE /v3/routes/{id}` — delete
 
 ### Expression Parser
-- [ ] Parse `match_recipient("pattern")`, `match_header("header", "pattern")`, `catch_all()`
-- [ ] Support `and` operator for combining expressions
+- [x] Parse `match_recipient("pattern")`, `match_header("header", "pattern")`, `catch_all()`
+- [x] Support `and` operator for combining expressions
 
 ### Action Handling
-- [ ] `forward("url")` — HTTP POST to URL with event payload
-- [ ] `forward("email")` — store as forwarded (no actual send)
-- [ ] `store(notify="url")` — store message + optional notification
-- [ ] `stop()` — halt further route evaluation
+- [x] `forward("url")` — HTTP POST to URL with event payload
+- [x] `forward("email")` — store as forwarded (no actual send)
+- [x] `store(notify="url")` — store message + optional notification
+- [x] `stop()` — halt further route evaluation
 
 ### Inbound Simulation
-- [ ] `POST /mock/inbound/{domain}` — simulate receiving an inbound email, evaluate routes, trigger actions
+- [x] `POST /mock/inbound/{domain}` — simulate receiving an inbound email, evaluate routes, trigger actions
 
 ---
 
