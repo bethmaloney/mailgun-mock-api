@@ -12,6 +12,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/event"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
 	"github.com/bethmaloney/mailgun-mock-api/internal/suppression"
+	"github.com/bethmaloney/mailgun-mock-api/internal/tag"
 	"github.com/bethmaloney/mailgun-mock-api/internal/template"
 	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
@@ -40,7 +41,8 @@ func New(db *gorm.DB) http.Handler {
 	// Run model migrations.
 	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &event.Event{},
 		&suppression.Bounce{}, &suppression.Complaint{}, &suppression.Unsubscribe{}, &suppression.AllowlistEntry{},
-		&template.Template{}, &template.TemplateVersion{})
+		&template.Template{}, &template.TemplateVersion{},
+		&tag.Tag{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -65,6 +67,9 @@ func New(db *gorm.DB) http.Handler {
 
 	// Template handlers
 	th := template.NewHandlers(db)
+
+	// Tag handlers
+	tgh := tag.NewHandlers(db)
 
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
@@ -179,6 +184,18 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/{name}/versions/{tag}", th.DeleteVersion)
 		r.Put("/{name}/versions/{tag}/copy/{new_tag}", th.CopyVersion)
 	})
+
+	// Tag routes
+	r.Route("/v3/{domain_name}/tags", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", tgh.ListTags)
+		r.Get("/{tag}", tgh.GetTag)
+		r.Put("/{tag}", tgh.UpdateTag)
+		r.Delete("/{tag}", tgh.DeleteTag)
+	})
+
+	// Tag limits route (different path pattern)
+	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/domains/{domain_name}/limits/tag", tgh.GetTagLimits)
 
 	// API Key routes
 	r.Route("/v1/keys", func(r chi.Router) {

@@ -13,6 +13,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/event"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
+	"github.com/bethmaloney/mailgun-mock-api/internal/tag"
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
@@ -218,6 +219,11 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 	if err := h.db.Create(&msg).Error; err != nil {
 		response.RespondError(w, http.StatusInternalServerError, "Failed to store message")
 		return
+	}
+
+	// Auto-create tags
+	if len(tags) > 0 {
+		tag.EnsureTags(h.db, domainName, tags)
 	}
 
 	// Generate events for each recipient

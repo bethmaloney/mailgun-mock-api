@@ -13,7 +13,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 4 | Events & Logs | in progress | Generation pipeline, querying, mock triggers |
 | 5 | Suppressions | in progress | Bounces, complaints, unsubscribes, allowlist |
 | 6 | Templates | in progress | CRUD, versioning, Handlebars rendering |
-| 7 | Tags & Stats | pending | Auto-creation, time-series stats, v1 stubs |
+| 7 | Tags & Stats | in progress | Auto-creation, time-series stats, v1 stubs |
 | 8 | Mailing Lists | pending | List/member CRUD, bulk ops, send integration |
 | 9 | Webhooks | pending | v3/v4/v1 APIs, delivery pipeline, signing |
 | 10 | Routes | pending | CRUD, expression parser, inbound simulation |
@@ -273,19 +273,19 @@ Auto-created labels on messages with time-series statistics.
 > Plan doc: [tags.md](./tags.md)
 
 ### Tag CRUD
-- [ ] Model: `Tag` (name, description, first-seen, last-seen — hyphenated for v3)
-- [ ] Auto-create tags on message send (from `o:tag` param, up to 10 per message)
-- [ ] `GET /v3/{domain}/tags` — list with pagination and prefix filter
-- [ ] `GET /v3/{domain}/tags/{tag}` — get single
-- [ ] `PUT /v3/{domain}/tags/{tag}` — update description
-- [ ] `DELETE /v3/{domain}/tags/{tag}` — delete (detaches from events, doesn't delete events)
+- [x] Model: `Tag` (name, description, first-seen, last-seen — hyphenated for v3)
+- [x] Auto-create tags on message send (from `o:tag` param, up to 10 per message)
+- [x] `GET /v3/{domain}/tags` — list with pagination and prefix filter
+- [x] `GET /v3/{domain}/tags/{tag}` — get single
+- [x] `PUT /v3/{domain}/tags/{tag}` — update description
+- [x] `DELETE /v3/{domain}/tags/{tag}` — delete (detaches from events, doesn't delete events)
 
 ### Tag Statistics
 - [ ] `GET /v3/{domain}/tags/{tag}/stats` — time-series stats bucketed by `resolution` (hour/day/month)
 - [ ] `GET /v3/{domain}/tags/{tag}/stats/aggregates/countries` — aggregate by country
 - [ ] `GET /v3/{domain}/tags/{tag}/stats/aggregates/providers` — aggregate by provider
 - [ ] `GET /v3/{domain}/tags/{tag}/stats/aggregates/devices` — aggregate by device
-- [ ] `GET /v3/domains/{domain}/limits/tag` — tag count and limit
+- [x] `GET /v3/domains/{domain}/limits/tag` — tag count and limit
 
 ### Domain-level Stats
 - [ ] `GET /v3/{domain}/stats/total` — domain-level time-series stats (shared computation with tag stats)
