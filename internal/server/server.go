@@ -402,6 +402,7 @@ func New(db *gorm.DB) http.Handler {
 		r.Get("/health", mock.HealthHandler)
 		r.Get("/config", h.GetConfig)
 		r.Put("/config", h.UpdateConfig)
+		r.Get("/dashboard", h.GetDashboard)
 		r.Post("/reset", h.ResetAll)
 		// Order matters: "/reset/messages" must be registered before "/reset/{domain}"
 		// so that chi matches the static path before the wildcard.

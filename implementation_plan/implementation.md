@@ -20,7 +20,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 11 | IPs & IP Pools | done | Stub — static IPs, pool CRUD |
 | 12 | Subaccounts | done | CRUD, limits, feature flags, isolation |
 | 13 | Metrics & Analytics | done | v3 stats, v1 metrics, usage, bounce classification |
-| 14 | Web UI — Foundation | pending | Shell, routing, dashboard |
+| 14 | Web UI — Foundation | done | Shell, routing, dashboard |
 | 15 | Web UI — Messages & Events | pending | Message/event list and detail views |
 | 16 | Web UI — Management | pending | Domains, suppressions, templates, lists, webhooks, routes |
 | 17 | Web UI — Testing & Real-time | pending | Event triggers, inbound sim, config, WebSocket |
@@ -496,14 +496,14 @@ Aggregate statistics derived from stored events.
 > Plan doc: [web-ui.md](./web-ui.md)
 
 ### App Shell & Routing
-- [ ] Set up Vue Router with navigation for all pages
-- [ ] Layout: sidebar navigation + main content area
-- [ ] API client module (axios/fetch wrapper for `/mock/*` and standard Mailgun endpoints)
-- [ ] Shared components: data tables with pagination, detail panels, status badges, toast notifications
+- [x] Set up Vue Router with navigation for all pages
+- [x] Layout: sidebar navigation + main content area
+- [x] API client module (axios/fetch wrapper for `/mock/*` and standard Mailgun endpoints)
+- [x] Shared components: data tables with pagination, detail panels, status badges, toast notifications
 
 ### Dashboard
-- [ ] `GET /mock/dashboard` — backend endpoint returning summary counts (messages, events, domains, etc.)
-- [ ] Dashboard page: summary cards, recent messages list, recent events list
+- [x] `GET /mock/dashboard` — backend endpoint returning summary counts (messages, events, domains, etc.)
+- [x] Dashboard page: summary cards, recent messages list, recent events list
 
 ---
 
