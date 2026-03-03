@@ -6,8 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bethmaloney/mailgun-mock-api/internal/database"
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm/clause"
 )
 
 // ---------------------------------------------------------------------------
@@ -26,6 +28,36 @@ type messageLookup struct {
 }
 
 func (messageLookup) TableName() string { return "stored_messages" }
+
+// allowlistLookup is a minimal struct for querying the allowlist_entries table
+type allowlistLookup struct {
+	database.BaseModel
+	DomainName string
+	Type       string
+	Value      string
+}
+
+func (allowlistLookup) TableName() string { return "allowlist_entries" }
+
+// isAllowlisted checks if a recipient address or its domain is on the allowlist.
+func (h *Handlers) isAllowlisted(domainName, recipientAddress string) bool {
+	// Check if the exact address is on the allowlist
+	var addrEntry allowlistLookup
+	if err := h.db.Where("domain_name = ? AND type = ? AND value = ?", domainName, "address", recipientAddress).First(&addrEntry).Error; err == nil {
+		return true
+	}
+
+	// Check if the recipient's domain is on the allowlist
+	recipientDomain := extractDomain(recipientAddress)
+	if recipientDomain != "" {
+		var domEntry allowlistLookup
+		if err := h.db.Where("domain_name = ? AND type = ? AND value = ?", domainName, "domain", recipientDomain).First(&domEntry).Error; err == nil {
+			return true
+		}
+	}
+
+	return false
+}
 
 // ---------------------------------------------------------------------------
 // Shared trigger helper
@@ -220,6 +252,22 @@ func (h *Handlers) TriggerFail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.createAndSaveEvent(w, ev, payload, domainName)
+
+	// Auto-create bounce entry for permanent failures (unless allowlisted)
+	if req.Severity == "permanent" {
+		recipient := firstRecipient(msg.To)
+		if !h.isAllowlisted(domainName, recipient) {
+			h.db.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "domain_name"}, {Name: "address"}},
+				DoUpdates: clause.AssignmentColumns([]string{"code", "error", "updated_at"}),
+			}).Create(&bounceLookup{
+				DomainName: domainName,
+				Address:    recipient,
+				Code:       "550",
+				Error:      "Bounced",
+			})
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -318,5 +366,16 @@ func (h *Handlers) TriggerComplain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.createAndSaveEvent(w, ev, payload, domainName)
+
+	// Auto-create complaint entry (allowlist does NOT prevent this)
+	recipient := firstRecipient(msg.To)
+	h.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "domain_name"}, {Name: "address"}},
+		DoUpdates: clause.AssignmentColumns([]string{"count", "updated_at"}),
+	}).Create(&complaintLookup{
+		DomainName: domainName,
+		Address:    recipient,
+		Count:      1,
+	})
 }
 

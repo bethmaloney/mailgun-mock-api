@@ -53,6 +53,41 @@ type domainLookup struct {
 func (domainLookup) TableName() string { return "domains" }
 
 // ---------------------------------------------------------------------------
+// Suppression lookup helpers (avoids importing suppression package)
+// ---------------------------------------------------------------------------
+
+// bounceLookup is a minimal struct for querying the bounces table
+type bounceLookup struct {
+	database.BaseModel
+	DomainName string
+	Address    string
+	Code       string
+	Error      string
+}
+
+func (bounceLookup) TableName() string { return "bounces" }
+
+// complaintLookup is a minimal struct for querying the complaints table
+type complaintLookup struct {
+	database.BaseModel
+	DomainName string
+	Address    string
+	Count      int
+}
+
+func (complaintLookup) TableName() string { return "complaints" }
+
+// unsubscribeLookup is a minimal struct for querying the unsubscribes table
+type unsubscribeLookup struct {
+	database.BaseModel
+	DomainName string
+	Address    string
+	Tags       string
+}
+
+func (unsubscribeLookup) TableName() string { return "unsubscribes" }
+
+// ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
 
@@ -314,6 +349,117 @@ func (h *Handlers) GenerateDeliveryEvent(domainName, messageID, storageKey, from
 		"certificate-verified": true,
 		"utf8":                 true,
 	}
+	payloadJSON, _ := json.Marshal(payload)
+	ev.Payload = string(payloadJSON)
+
+	return h.db.Create(&ev).Error
+}
+
+// ---------------------------------------------------------------------------
+// Suppression Checking
+// ---------------------------------------------------------------------------
+
+// CheckSuppression checks if a recipient is on any suppression list for the domain.
+// Returns the suppression reason (e.g., "suppress-bounce") or "" if not suppressed.
+// messageTags should be a JSON array string of the message's tags.
+func (h *Handlers) CheckSuppression(domainName, recipient, messageTags string) string {
+	// 1. Check bounce list
+	var bounce bounceLookup
+	if err := h.db.Where("domain_name = ? AND address = ?", domainName, recipient).First(&bounce).Error; err == nil {
+		return "suppress-bounce"
+	}
+
+	// 2. Check complaint list
+	var complaint complaintLookup
+	if err := h.db.Where("domain_name = ? AND address = ?", domainName, recipient).First(&complaint).Error; err == nil {
+		return "suppress-complaint"
+	}
+
+	// 3. Check unsubscribe list
+	var unsub unsubscribeLookup
+	if err := h.db.Where("domain_name = ? AND address = ?", domainName, recipient).First(&unsub).Error; err == nil {
+		// Parse the unsubscribe tags
+		var unsubTags []string
+		if unsub.Tags != "" {
+			_ = json.Unmarshal([]byte(unsub.Tags), &unsubTags)
+		}
+
+		// If tags contain "*", always suppress
+		for _, tag := range unsubTags {
+			if tag == "*" {
+				return "suppress-unsubscribe"
+			}
+		}
+
+		// Parse the message tags
+		var msgTags []string
+		if messageTags != "" && messageTags != "[]" {
+			_ = json.Unmarshal([]byte(messageTags), &msgTags)
+		}
+
+		// Check if any unsubscribe tag matches any message tag
+		for _, unsubTag := range unsubTags {
+			for _, msgTag := range msgTags {
+				if unsubTag == msgTag {
+					return "suppress-unsubscribe"
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// GenerateSuppressionFailedEvent creates a "failed" event for a recipient
+// that is on a suppression list. The reason should be one of
+// "suppress-bounce", "suppress-complaint", or "suppress-unsubscribe".
+func (h *Handlers) GenerateSuppressionFailedEvent(domainName, messageID, storageKey, from, recipient, subject, tags, userVariables, reason string) error {
+	recipientDomain := extractDomain(recipient)
+	ts := float64(time.Now().UnixMicro()) / 1e6
+
+	ev := Event{
+		DomainName:      domainName,
+		EventType:       "failed",
+		Timestamp:       ts,
+		LogLevel:        "error",
+		MessageID:       messageID,
+		StorageKey:      storageKey,
+		Recipient:       recipient,
+		RecipientDomain: recipientDomain,
+		Tags:            tags,
+		UserVariables:   userVariables,
+		Severity:        "permanent",
+		Reason:          reason,
+		From:            from,
+		Subject:         subject,
+	}
+
+	// Build payload
+	payload := buildEventPayload(ev, domainName)
+
+	// Determine description based on reason
+	var description string
+	switch reason {
+	case "suppress-bounce":
+		description = "Not delivering to previously bounced address"
+	case "suppress-complaint":
+		description = "Not delivering to a user who marked your messages as spam"
+	case "suppress-unsubscribe":
+		description = "Not delivering to unsubscribed address"
+	default:
+		description = "Suppressed"
+	}
+
+	// Add delivery-status block
+	payload["delivery-status"] = map[string]interface{}{
+		"code":          550,
+		"attempt-no":    1,
+		"description":   description,
+		"message":       description,
+		"enhanced-code": "5.1.1",
+		"bounce-type":   "hard",
+	}
+
 	payloadJSON, _ := json.Marshal(payload)
 	ev.Payload = string(payloadJSON)
 

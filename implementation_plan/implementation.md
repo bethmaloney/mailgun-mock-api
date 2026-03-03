@@ -10,8 +10,8 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 1 | Domains | done | CRUD, verification, tracking, connection settings |
 | 2 | Credentials & Keys | done | SMTP creds, API keys, IP allowlist |
 | 3 | Messages & Storage | done | Send, store, retrieve, resend |
-| 4 | Events & Logs | in progress | Generation pipeline, querying, mock triggers |
-| 5 | Suppressions | in progress | Bounces, complaints, unsubscribes, allowlist |
+| 4 | Events & Logs | done | Generation pipeline, querying, mock triggers |
+| 5 | Suppressions | done | Bounces, complaints, unsubscribes, allowlist |
 | 6 | Templates | in progress | CRUD, versioning, Handlebars rendering |
 | 7 | Tags & Stats | in progress | Auto-creation, time-series stats, v1 stubs |
 | 8 | Mailing Lists | in progress | List/member CRUD, bulk ops, send integration |
@@ -179,7 +179,7 @@ Event generation pipeline — produces events for every message lifecycle transi
   - `immediate`: generate `delivered` (or `failed`) synchronously on send
   - `delayed`: generate after configurable delay
   - `manual`: only via mock trigger endpoints
-- [ ] Check suppression lists before generating `delivered` — produce `failed` with reason if suppressed
+- [x] Check suppression lists before generating `delivered` — produce `failed` with reason if suppressed
 - [x] Generate unique event IDs and realistic `log-level`, `delivery-status` fields
 
 ### Event Querying
@@ -227,11 +227,11 @@ Per-domain suppression lists that integrate with the message pipeline.
 ### Allowlist
 - [x] Model: `AllowlistEntry` (value, type: "address"|"domain", createdAt — camelCase)
 - [x] Same 6 endpoints at `/v3/{domain}/whitelists/*`
-- [ ] Allowlist check: prevents automatic bounce recording but doesn't override complaints/unsubscribes
+- [x] Allowlist check: prevents automatic bounce recording but doesn't override complaints/unsubscribes
 
 ### Suppression Integration
-- [ ] Hook into message send pipeline: check all suppression lists per recipient before generating delivery events
-- [ ] Auto-create suppression entries on relevant events (bounce → bounces list, complaint → complaints list)
+- [x] Hook into message send pipeline: check all suppression lists per recipient before generating delivery events
+- [x] Auto-create suppression entries on relevant events (bounce → bounces list, complaint → complaints list)
 
 ---
 

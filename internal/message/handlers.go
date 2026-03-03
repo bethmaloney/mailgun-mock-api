@@ -279,7 +279,15 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 				tagsJSON, string(customVariablesJSON),
 			)
 
-			if h.config != nil && h.config.EventGeneration.AutoDeliver && h.config.EventGeneration.DeliveryDelayMs == 0 {
+			// Check if recipient is on any suppression list
+			suppressionReason := h.eventHandlers.CheckSuppression(domainName, recipient, tagsJSON)
+			if suppressionReason != "" {
+				// Generate a suppression failed event instead of delivery
+				_ = h.eventHandlers.GenerateSuppressionFailedEvent(
+					domainName, messageID, storageKey, from, recipient, subject,
+					tagsJSON, string(customVariablesJSON), suppressionReason,
+				)
+			} else if h.config != nil && h.config.EventGeneration.AutoDeliver && h.config.EventGeneration.DeliveryDelayMs == 0 {
 				_ = h.eventHandlers.GenerateDeliveryEvent(
 					domainName, messageID, storageKey, from, recipient, subject,
 					tagsJSON, string(customVariablesJSON),
