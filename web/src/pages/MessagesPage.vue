@@ -194,7 +194,7 @@ async function viewDetail(row: Record<string, unknown>) {
 }
 
 async function deleteMessage(storageKey: string) {
-  if (!confirm("Delete this message?")) return;
+  if (!window.confirm("Delete this message?")) return;
   try {
     await api.del(`/mock/messages/${encodeURIComponent(storageKey)}`);
     if (
@@ -211,7 +211,7 @@ async function deleteMessage(storageKey: string) {
 }
 
 async function clearAll() {
-  if (!confirm("Delete ALL messages, events, and attachments?")) return;
+  if (!window.confirm("Delete ALL messages, events, and attachments?")) return;
   try {
     await api.post("/mock/messages/clear");
     selectedMessage.value = null;
@@ -249,28 +249,28 @@ onMounted(() => fetchMessages());
         placeholder="Domain"
         class="filter-input"
         @keyup.enter="applyFilters"
-      />
+      >
       <input
         v-model="filterFrom"
         type="text"
         placeholder="From"
         class="filter-input"
         @keyup.enter="applyFilters"
-      />
+      >
       <input
         v-model="filterTo"
         type="text"
         placeholder="To"
         class="filter-input"
         @keyup.enter="applyFilters"
-      />
+      >
       <input
         v-model="filterSubject"
         type="text"
         placeholder="Subject"
         class="filter-input"
         @keyup.enter="applyFilters"
-      />
+      >
       <button
         class="btn btn-primary"
         @click="applyFilters"

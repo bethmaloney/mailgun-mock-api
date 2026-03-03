@@ -249,7 +249,7 @@ onMounted(() => fetchDomains());
           placeholder="Recipient"
           class="filter-input"
           @keyup.enter="applyFilters"
-        />
+        >
         <button
           class="btn btn-primary"
           :disabled="!selectedDomain"
