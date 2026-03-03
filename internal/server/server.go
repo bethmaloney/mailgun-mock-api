@@ -146,6 +146,15 @@ func New(db *gorm.DB) http.Handler {
 		// so that chi matches the static path before the wildcard.
 		r.Post("/reset/messages", h.ResetMessages)
 		r.Post("/reset/{domain}", h.ResetDomain)
+		// Mock event triggers
+		r.Route("/events/{domain}", func(r chi.Router) {
+			r.Post("/deliver/{message_id}", eh.TriggerDeliver)
+			r.Post("/fail/{message_id}", eh.TriggerFail)
+			r.Post("/open/{message_id}", eh.TriggerOpen)
+			r.Post("/click/{message_id}", eh.TriggerClick)
+			r.Post("/unsubscribe/{message_id}", eh.TriggerUnsubscribe)
+			r.Post("/complain/{message_id}", eh.TriggerComplain)
+		})
 	})
 
 	// Serve embedded Vue SPA

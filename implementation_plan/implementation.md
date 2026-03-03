@@ -191,12 +191,12 @@ Event generation pipeline — produces events for every message lifecycle transi
 - [x] Generate opaque `next`/`previous` page URLs
 
 ### Mock Event Triggers
-- [ ] `POST /mock/events/{domain}/deliver/{message_id}` — trigger delivered event
-- [ ] `POST /mock/events/{domain}/fail/{message_id}` — trigger failed event
-- [ ] `POST /mock/events/{domain}/open/{message_id}` — trigger opened event
-- [ ] `POST /mock/events/{domain}/click/{message_id}` — trigger clicked event
-- [ ] `POST /mock/events/{domain}/unsubscribe/{message_id}` — trigger unsubscribed event
-- [ ] `POST /mock/events/{domain}/complaint/{message_id}` — trigger complained event
+- [x] `POST /mock/events/{domain}/deliver/{message_id}` — trigger delivered event
+- [x] `POST /mock/events/{domain}/fail/{message_id}` — trigger failed event
+- [x] `POST /mock/events/{domain}/open/{message_id}` — trigger opened event
+- [x] `POST /mock/events/{domain}/click/{message_id}` — trigger clicked event
+- [x] `POST /mock/events/{domain}/unsubscribe/{message_id}` — trigger unsubscribed event
+- [x] `POST /mock/events/{domain}/complain/{message_id}` — trigger complained event
 
 ---
 
