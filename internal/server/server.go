@@ -9,6 +9,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/apikey"
 	"github.com/bethmaloney/mailgun-mock-api/internal/credential"
 	"github.com/bethmaloney/mailgun-mock-api/internal/domain"
+	"github.com/bethmaloney/mailgun-mock-api/internal/message"
 	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
@@ -33,8 +34,8 @@ func New(db *gorm.DB) http.Handler {
 		MaxAge:           300,
 	}))
 
-	// Run domain model migrations.
-	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{})
+	// Run model migrations.
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -50,6 +51,9 @@ func New(db *gorm.DB) http.Handler {
 
 	// IP Allowlist handlers
 	ah := allowlist.NewHandlers(db)
+
+	// Message handlers
+	mh := message.NewHandlers(db, h.Config())
 
 	r.Route("/v4/domains", func(r chi.Router) {
 		r.Use(appMiddleware.BasicAuth(h.Config()))
@@ -78,6 +82,19 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/{name}/credentials", ch.DeleteAllCredentials)
 		r.Put("/{name}/credentials/{spec}", ch.UpdateCredential)
 		r.Delete("/{name}/credentials/{spec}", ch.DeleteCredential)
+	})
+
+	// Message sending route
+	r.Route("/v3/{domain_name}/messages", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Post("/", mh.SendMessage)
+	})
+
+	// Message storage routes (retrieve / delete)
+	r.Route("/v3/domains/{domain_name}/messages", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/{storage_key}", mh.GetMessage)
+		r.Delete("/{storage_key}", mh.DeleteMessage)
 	})
 
 	// API Key routes

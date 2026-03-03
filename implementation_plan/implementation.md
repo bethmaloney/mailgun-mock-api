@@ -9,7 +9,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 0 | Foundation & Cross-cutting | in progress | Auth, pagination, config, response formatting |
 | 1 | Domains | done | CRUD, verification, tracking, connection settings |
 | 2 | Credentials & Keys | done | SMTP creds, API keys, IP allowlist |
-| 3 | Messages & Storage | pending | Send, store, retrieve, resend |
+| 3 | Messages & Storage | in progress | Send, store, retrieve, resend |
 | 4 | Events & Logs | pending | Generation pipeline, querying, mock triggers |
 | 5 | Suppressions | pending | Bounces, complaints, unsubscribes, allowlist |
 | 6 | Templates | pending | CRUD, versioning, Handlebars rendering |
@@ -141,20 +141,20 @@ Core message acceptance pipeline. Generates events that feed into all downstream
 > Plan doc: [messages.md](./messages.md)
 
 ### Message Sending
-- [ ] Model: `StoredMessage` with all fields (from, to, cc, bcc, subject, body-plain, body-html, attachments, headers, tags, variables)
-- [ ] `POST /v3/{domain}/messages` — accept multipart/form-data, validate required fields (from, to, subject or template), store message
-- [ ] Parse recipient variables (`recipient-variables` JSON) for batch sending
-- [ ] Handle `o:tag` (up to 10 tags per message), `o:tracking-*` overrides, `o:deliverytime`, `o:testmode`
-- [ ] Handle custom headers (`h:X-*`), custom variables (`v:*`)
-- [ ] Return `{ "id": "<message-id>", "message": "Queued. Thank you." }`
+- [x] Model: `StoredMessage` with all fields (from, to, cc, bcc, subject, body-plain, body-html, attachments, headers, tags, variables)
+- [x] `POST /v3/{domain}/messages` — accept multipart/form-data, validate required fields (from, to, subject or template), store message
+- [x] Parse recipient variables (`recipient-variables` JSON) for batch sending
+- [x] Handle `o:tag` (up to 10 tags per message), `o:tracking-*` overrides, `o:deliverytime`, `o:testmode`
+- [x] Handle custom headers (`h:X-*`), custom variables (`v:*`)
+- [x] Return `{ "id": "<message-id>", "message": "Queued. Thank you." }`
 
 ### MIME Sending
 - [ ] `POST /v3/{domain}/messages.mime` — accept raw MIME with `to` override
 
 ### Message Storage & Retrieval
-- [ ] Generate storage keys (opaque format, e.g., `mock-<uuid>`)
-- [ ] `GET /v3/domains/{domain}/messages/{storage_key}` — retrieve stored message with full headers
-- [ ] `DELETE /v3/domains/{domain}/messages/{storage_key}` — delete stored message
+- [x] Generate storage keys (opaque format, e.g., `mock-<uuid>`)
+- [x] `GET /v3/domains/{domain}/messages/{storage_key}` — retrieve stored message with full headers
+- [x] `DELETE /v3/domains/{domain}/messages/{storage_key}` — delete stored message
 - [ ] Store attachment bytes; serve via storage URL in message detail
 
 ### Message Resend
