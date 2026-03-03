@@ -11,7 +11,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 2 | Credentials & Keys | done | SMTP creds, API keys, IP allowlist |
 | 3 | Messages & Storage | in progress | Send, store, retrieve, resend |
 | 4 | Events & Logs | in progress | Generation pipeline, querying, mock triggers |
-| 5 | Suppressions | pending | Bounces, complaints, unsubscribes, allowlist |
+| 5 | Suppressions | in progress | Bounces, complaints, unsubscribes, allowlist |
 | 6 | Templates | pending | CRUD, versioning, Handlebars rendering |
 | 7 | Tags & Stats | pending | Auto-creation, time-series stats, v1 stubs |
 | 8 | Mailing Lists | pending | List/member CRUD, bulk ops, send integration |
@@ -207,26 +207,26 @@ Per-domain suppression lists that integrate with the message pipeline.
 > Plan doc: [suppressions.md](./suppressions.md)
 
 ### Bounces
-- [ ] Model: `Bounce` (address, code, error, created_at — snake_case)
-- [ ] `GET /v3/{domain}/bounces` — list with pagination
-- [ ] `GET /v3/{domain}/bounces/{address}` — get single
-- [ ] `POST /v3/{domain}/bounces` — add single or batch (JSON array)
-- [ ] `DELETE /v3/{domain}/bounces/{address}` — delete single
-- [ ] `DELETE /v3/{domain}/bounces` — clear all
-- [ ] `POST /v3/{domain}/bounces/import` — CSV import (return 202 + async task)
+- [x] Model: `Bounce` (address, code, error, created_at — snake_case)
+- [x] `GET /v3/{domain}/bounces` — list with pagination
+- [x] `GET /v3/{domain}/bounces/{address}` — get single
+- [x] `POST /v3/{domain}/bounces` — add single or batch (JSON array)
+- [x] `DELETE /v3/{domain}/bounces/{address}` — delete single
+- [x] `DELETE /v3/{domain}/bounces` — clear all
+- [x] `POST /v3/{domain}/bounces/import` — CSV import (return 202 + async task)
 
 ### Complaints
-- [ ] Model: `Complaint` (address, count, created_at)
-- [ ] Same 6 endpoints as bounces at `/v3/{domain}/complaints/*`
+- [x] Model: `Complaint` (address, count, created_at)
+- [x] Same 6 endpoints as bounces at `/v3/{domain}/complaints/*`
 
 ### Unsubscribes
-- [ ] Model: `Unsubscribe` (address, tags, created_at)
-- [ ] Same 6 endpoints as bounces at `/v3/{domain}/unsubscribes/*`
-- [ ] Handle `tag`/`tags` field inconsistency (singular string vs plural array)
+- [x] Model: `Unsubscribe` (address, tags, created_at)
+- [x] Same 6 endpoints as bounces at `/v3/{domain}/unsubscribes/*`
+- [x] Handle `tag`/`tags` field inconsistency (singular string vs plural array)
 
 ### Allowlist
-- [ ] Model: `AllowlistEntry` (value, type: "address"|"domain", createdAt — camelCase)
-- [ ] Same 6 endpoints at `/v3/{domain}/whitelists/*`
+- [x] Model: `AllowlistEntry` (value, type: "address"|"domain", createdAt — camelCase)
+- [x] Same 6 endpoints at `/v3/{domain}/whitelists/*`
 - [ ] Allowlist check: prevents automatic bounce recording but doesn't override complaints/unsubscribes
 
 ### Suppression Integration

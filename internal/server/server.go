@@ -11,6 +11,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/domain"
 	"github.com/bethmaloney/mailgun-mock-api/internal/event"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
+	"github.com/bethmaloney/mailgun-mock-api/internal/suppression"
 	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
@@ -36,7 +37,8 @@ func New(db *gorm.DB) http.Handler {
 	}))
 
 	// Run model migrations.
-	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &event.Event{})
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &event.Event{},
+		&suppression.Bounce{}, &suppression.Complaint{}, &suppression.Unsubscribe{}, &suppression.AllowlistEntry{})
 
 	// Mock management routes
 	h := mock.NewHandlers(db)
@@ -55,6 +57,9 @@ func New(db *gorm.DB) http.Handler {
 
 	// Event handlers
 	eh := event.NewHandlers(db, h.Config())
+
+	// Suppression handlers
+	sh := suppression.NewHandlers(db)
 
 	// Message handlers
 	mh := message.NewHandlers(db, h.Config())
@@ -114,6 +119,44 @@ func New(db *gorm.DB) http.Handler {
 
 	// Sending queues route
 	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/domains/{domain_name}/sending_queues", mh.GetSendingQueues)
+
+	// Suppression routes
+	r.Route("/v3/{domain_name}/bounces", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", sh.ListBounces)
+		r.Post("/", sh.CreateBounces)
+		r.Post("/import", sh.ImportBounces)
+		r.Get("/{address}", sh.GetBounce)
+		r.Delete("/{address}", sh.DeleteBounce)
+		r.Delete("/", sh.ClearBounces)
+	})
+	r.Route("/v3/{domain_name}/complaints", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", sh.ListComplaints)
+		r.Post("/", sh.CreateComplaints)
+		r.Post("/import", sh.ImportComplaints)
+		r.Get("/{address}", sh.GetComplaint)
+		r.Delete("/{address}", sh.DeleteComplaint)
+		r.Delete("/", sh.ClearComplaints)
+	})
+	r.Route("/v3/{domain_name}/unsubscribes", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", sh.ListUnsubscribes)
+		r.Post("/", sh.CreateUnsubscribes)
+		r.Post("/import", sh.ImportUnsubscribes)
+		r.Get("/{address}", sh.GetUnsubscribe)
+		r.Delete("/{address}", sh.DeleteUnsubscribe)
+		r.Delete("/", sh.ClearUnsubscribes)
+	})
+	r.Route("/v3/{domain_name}/whitelists", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", sh.ListAllowlist)
+		r.Post("/", sh.CreateAllowlistEntry)
+		r.Post("/import", sh.ImportAllowlist)
+		r.Get("/{value}", sh.GetAllowlistEntry)
+		r.Delete("/{value}", sh.DeleteAllowlistEntry)
+		r.Delete("/", sh.ClearAllowlist)
+	})
 
 	// API Key routes
 	r.Route("/v1/keys", func(r chi.Router) {
