@@ -78,7 +78,10 @@ func isValidIPOrCIDR(address string) bool {
 // respondWithAllEntries queries all entries and writes them as JSON.
 func (h *Handlers) respondWithAllEntries(w http.ResponseWriter) {
 	var entries []IPAllowlistEntry
-	h.db.Find(&entries)
+	if err := h.db.Order("created_at ASC").Find(&entries).Error; err != nil {
+		response.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("failed to list entries: %v", err))
+		return
+	}
 
 	items := make([]entryDTO, 0, len(entries))
 	for _, e := range entries {
