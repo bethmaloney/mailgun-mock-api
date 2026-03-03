@@ -221,6 +221,29 @@ func (h *Handlers) GetTagLimits(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------------------------------------------------------------------------
+// Singular Path Handlers (OpenAPI spec — tag from query parameter)
+// ---------------------------------------------------------------------------
+
+// GetTagByQuery handles GET /v3/{domain_name}/tag?tag={name}.
+// It reads the tag name from the ?tag= query parameter instead of a URL path segment.
+func (h *Handlers) GetTagByQuery(w http.ResponseWriter, r *http.Request) {
+	tagName := strings.ToLower(r.URL.Query().Get("tag"))
+	if tagName == "" {
+		response.RespondError(w, http.StatusBadRequest, "tag query parameter is required")
+		return
+	}
+	domainName := chi.URLParam(r, "domain_name")
+
+	var t Tag
+	if err := h.db.Where("domain_name = ? AND tag = ?", domainName, tagName).First(&t).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, "tag not found")
+		return
+	}
+
+	response.RespondJSON(w, http.StatusOK, tagMap(&t))
+}
+
+// ---------------------------------------------------------------------------
 // Tag Auto-creation
 // ---------------------------------------------------------------------------
 

@@ -13,7 +13,7 @@ Tracks implementation progress across all feature areas. Each phase builds on th
 | 4 | Events & Logs | done | Generation pipeline, querying, mock triggers |
 | 5 | Suppressions | done | Bounces, complaints, unsubscribes, allowlist |
 | 6 | Templates | done | CRUD, versioning, Handlebars rendering |
-| 7 | Tags & Stats | in progress | Auto-creation, time-series stats, v1 stubs |
+| 7 | Tags & Stats | done | Auto-creation, time-series stats, v1 stubs, singular path support |
 | 8 | Mailing Lists | in progress | List/member CRUD, bulk ops, send integration |
 | 9 | Webhooks | pending | v3/v4/v1 APIs, delivery pipeline, signing |
 | 10 | Routes | pending | CRUD, expression parser, inbound simulation |
@@ -292,13 +292,13 @@ Auto-created labels on messages with time-series statistics.
 - [x] Support `event` param as repeatable query parameter
 
 ### Path Discrepancy Handling
-- [ ] Support both `/v3/{domain}/tags/{tag}` (SDK) and `/v3/{domain}/tag?tag=...` (OpenAPI) paths
+- [x] Support both `/v3/{domain}/tags/{tag}` (SDK) and `/v3/{domain}/tag?tag=...` (OpenAPI) paths
 
 ### v1 Analytics Tags API (stub)
-- [ ] `POST /v1/analytics/tags` — list tags (POST with JSON body)
-- [ ] `PUT /v1/analytics/tags/{tag}` — update
-- [ ] `DELETE /v1/analytics/tags/{tag}` — delete
-- [ ] `GET /v1/analytics/tags/limits` — limits
+- [x] `POST /v1/analytics/tags` — list tags (POST with JSON body)
+- [x] `PUT /v1/analytics/tags/{tag}` — update
+- [x] `DELETE /v1/analytics/tags/{tag}` — delete
+- [x] `GET /v1/analytics/tags/limits` — limits
 
 ---
 

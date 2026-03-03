@@ -206,11 +206,30 @@ func New(db *gorm.DB) http.Handler {
 		r.Get("/{tag}/stats/aggregates/devices", tgh.GetTagStatsDevices)
 	})
 
+	// Singular tag paths (OpenAPI spec style — tag from query parameter)
+	r.Route("/v3/{domain_name}/tag", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Get("/", tgh.GetTagByQuery)
+		r.Get("/stats", tgh.GetTagStatsByQuery)
+		r.Get("/stats/aggregates/countries", tgh.GetTagStatsCountriesByQuery)
+		r.Get("/stats/aggregates/providers", tgh.GetTagStatsProvidersByQuery)
+		r.Get("/stats/aggregates/devices", tgh.GetTagStatsDevicesByQuery)
+	})
+
 	// Domain-level stats
 	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/stats/total", tgh.GetDomainStats)
 
 	// Tag limits route (different path pattern)
 	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/domains/{domain_name}/limits/tag", tgh.GetTagLimits)
+
+	// v1 Analytics Tags API (account-level, not domain-scoped)
+	r.Route("/v1/analytics/tags", func(r chi.Router) {
+		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Post("/", tgh.V1ListTags)
+		r.Put("/", tgh.V1UpdateTag)
+		r.Delete("/", tgh.V1DeleteTag)
+		r.Get("/limits", tgh.V1GetTagLimits)
+	})
 
 	// Mailing list routes
 	r.Route("/v3/lists", func(r chi.Router) {

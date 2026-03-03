@@ -464,3 +464,114 @@ func (h *Handlers) GetTagStatsDevices(w http.ResponseWriter, r *http.Request) {
 		"devices": map[string]interface{}{},
 	})
 }
+
+// ---------------------------------------------------------------------------
+// Singular-path stats handlers (tag from query parameter)
+// ---------------------------------------------------------------------------
+
+// GetTagStatsByQuery handles GET /v3/{domain_name}/tag/stats?tag={name}.
+func (h *Handlers) GetTagStatsByQuery(w http.ResponseWriter, r *http.Request) {
+	tagName := strings.ToLower(r.URL.Query().Get("tag"))
+	if tagName == "" {
+		response.RespondError(w, http.StatusBadRequest, "tag query parameter is required")
+		return
+	}
+	domainName := chi.URLParam(r, "domain_name")
+
+	// Validate event param
+	eventTypes := r.URL.Query()["event"]
+	if len(eventTypes) == 0 {
+		response.RespondError(w, http.StatusBadRequest, "event is required")
+		return
+	}
+	for _, et := range eventTypes {
+		if !validEventTypes[et] {
+			response.RespondError(w, http.StatusBadRequest, "invalid event type")
+			return
+		}
+	}
+
+	var t Tag
+	if err := h.db.Where("domain_name = ? AND tag = ?", domainName, tagName).First(&t).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, "tag not found")
+		return
+	}
+
+	stats, start, end, resolution, err := h.queryStats(r, domainName, tagName, eventTypes)
+	if err != nil {
+		response.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"tag":         t.Tag,
+		"description": t.Description,
+		"start":       start.UTC().Format(rfc2822),
+		"end":         end.UTC().Format(rfc2822),
+		"resolution":  resolution,
+		"stats":       stats,
+	})
+}
+
+// GetTagStatsCountriesByQuery handles GET /v3/{domain_name}/tag/stats/aggregates/countries?tag={name}.
+func (h *Handlers) GetTagStatsCountriesByQuery(w http.ResponseWriter, r *http.Request) {
+	tagName := strings.ToLower(r.URL.Query().Get("tag"))
+	if tagName == "" {
+		response.RespondError(w, http.StatusBadRequest, "tag query parameter is required")
+		return
+	}
+	domainName := chi.URLParam(r, "domain_name")
+
+	var t Tag
+	if err := h.db.Where("domain_name = ? AND tag = ?", domainName, tagName).First(&t).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, "tag not found")
+		return
+	}
+
+	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"tag":       t.Tag,
+		"countries": map[string]interface{}{},
+	})
+}
+
+// GetTagStatsProvidersByQuery handles GET /v3/{domain_name}/tag/stats/aggregates/providers?tag={name}.
+func (h *Handlers) GetTagStatsProvidersByQuery(w http.ResponseWriter, r *http.Request) {
+	tagName := strings.ToLower(r.URL.Query().Get("tag"))
+	if tagName == "" {
+		response.RespondError(w, http.StatusBadRequest, "tag query parameter is required")
+		return
+	}
+	domainName := chi.URLParam(r, "domain_name")
+
+	var t Tag
+	if err := h.db.Where("domain_name = ? AND tag = ?", domainName, tagName).First(&t).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, "tag not found")
+		return
+	}
+
+	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"tag":       t.Tag,
+		"providers": map[string]interface{}{},
+	})
+}
+
+// GetTagStatsDevicesByQuery handles GET /v3/{domain_name}/tag/stats/aggregates/devices?tag={name}.
+func (h *Handlers) GetTagStatsDevicesByQuery(w http.ResponseWriter, r *http.Request) {
+	tagName := strings.ToLower(r.URL.Query().Get("tag"))
+	if tagName == "" {
+		response.RespondError(w, http.StatusBadRequest, "tag query parameter is required")
+		return
+	}
+	domainName := chi.URLParam(r, "domain_name")
+
+	var t Tag
+	if err := h.db.Where("domain_name = ? AND tag = ?", domainName, tagName).First(&t).Error; err != nil {
+		response.RespondError(w, http.StatusNotFound, "tag not found")
+		return
+	}
+
+	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"tag":     t.Tag,
+		"devices": map[string]interface{}{},
+	})
+}
