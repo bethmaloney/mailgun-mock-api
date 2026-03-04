@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -184,6 +185,9 @@ func (h *Handlers) ListBounces(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetBounce(w http.ResponseWriter, r *http.Request) {
 	domainName := chi.URLParam(r, "domain_name")
 	address := chi.URLParam(r, "address")
+	if decoded, err := url.PathUnescape(address); err == nil {
+		address = decoded
+	}
 
 	var bounce Bounce
 	if err := h.db.Where("domain_name = ? AND address = ?", domainName, address).First(&bounce).Error; err != nil {
@@ -331,6 +335,9 @@ func (h *Handlers) ImportBounces(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) DeleteBounce(w http.ResponseWriter, r *http.Request) {
 	domainName := chi.URLParam(r, "domain_name")
 	address := chi.URLParam(r, "address")
+	if decoded, err := url.PathUnescape(address); err == nil {
+		address = decoded
+	}
 
 	result := h.db.Where("domain_name = ? AND address = ?", domainName, address).Delete(&Bounce{})
 	if result.RowsAffected == 0 {
@@ -436,6 +443,9 @@ func (h *Handlers) ListComplaints(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetComplaint(w http.ResponseWriter, r *http.Request) {
 	domainName := chi.URLParam(r, "domain_name")
 	address := chi.URLParam(r, "address")
+	if decoded, err := url.PathUnescape(address); err == nil {
+		address = decoded
+	}
 
 	var complaint Complaint
 	if err := h.db.Where("domain_name = ? AND address = ?", domainName, address).First(&complaint).Error; err != nil {
@@ -562,6 +572,9 @@ func (h *Handlers) ImportComplaints(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) DeleteComplaint(w http.ResponseWriter, r *http.Request) {
 	domainName := chi.URLParam(r, "domain_name")
 	address := chi.URLParam(r, "address")
+	if decoded, err := url.PathUnescape(address); err == nil {
+		address = decoded
+	}
 
 	result := h.db.Where("domain_name = ? AND address = ?", domainName, address).Delete(&Complaint{})
 	if result.RowsAffected == 0 {
@@ -668,6 +681,9 @@ func (h *Handlers) ListUnsubscribes(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	domainName := chi.URLParam(r, "domain_name")
 	address := chi.URLParam(r, "address")
+	if decoded, err := url.PathUnescape(address); err == nil {
+		address = decoded
+	}
 
 	var unsub Unsubscribe
 	if err := h.db.Where("domain_name = ? AND address = ?", domainName, address).First(&unsub).Error; err != nil {
@@ -814,6 +830,9 @@ func (h *Handlers) ImportUnsubscribes(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) DeleteUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	domainName := chi.URLParam(r, "domain_name")
 	address := chi.URLParam(r, "address")
+	if decoded, err := url.PathUnescape(address); err == nil {
+		address = decoded
+	}
 
 	result := h.db.Where("domain_name = ? AND address = ?", domainName, address).Delete(&Unsubscribe{})
 	if result.RowsAffected == 0 {
@@ -920,6 +939,9 @@ func (h *Handlers) ListAllowlist(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetAllowlistEntry(w http.ResponseWriter, r *http.Request) {
 	domainName := chi.URLParam(r, "domain_name")
 	value := chi.URLParam(r, "value")
+	if decoded, err := url.PathUnescape(value); err == nil {
+		value = decoded
+	}
 
 	var entry AllowlistEntry
 	if err := h.db.Where("domain_name = ? AND value = ?", domainName, value).First(&entry).Error; err != nil {
@@ -1033,6 +1055,9 @@ func (h *Handlers) ImportAllowlist(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) DeleteAllowlistEntry(w http.ResponseWriter, r *http.Request) {
 	domainName := chi.URLParam(r, "domain_name")
 	value := chi.URLParam(r, "value")
+	if decoded, err := url.PathUnescape(value); err == nil {
+		value = decoded
+	}
 
 	result := h.db.Where("domain_name = ? AND value = ?", domainName, value).Delete(&AllowlistEntry{})
 	if result.RowsAffected == 0 {
