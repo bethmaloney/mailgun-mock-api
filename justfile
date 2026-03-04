@@ -26,6 +26,14 @@ lint:
     go vet ./...
     cd web && npm run lint
 
+# Run integration tests (optionally filter by section name, e.g. just integration Credentials)
+integration section="":
+    @if [ -z "{{section}}" ]; then \
+        go test ./tests/integration/ -v; \
+    else \
+        go test ./tests/integration/ -run "Test{{section}}" -v; \
+    fi
+
 # Remove build artifacts
 clean:
     rm -rf mailgun-mock-api
