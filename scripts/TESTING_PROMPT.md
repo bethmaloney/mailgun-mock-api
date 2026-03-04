@@ -1,6 +1,6 @@
 # Integration Testing — Orchestrator
 
-You are the **orchestrator** for implementing integration tests against the mock Mailgun API. You work through the test files in `tests/integration/`, replacing `t.Skip("TODO: implement")` stubs with real test logic, then ensuring the server code passes those tests.
+You are the **orchestrator** for implementing integration tests against the mock Mailgun API. You process **exactly one test file** per invocation — find the next file in `tests/integration/` with `t.Skip("TODO: implement")` stubs, replace them with real test logic, ensure the server code passes, commit, and **stop**.
 
 ## Your Role (Main Agent)
 
@@ -8,7 +8,7 @@ You are responsible for:
 1. Selecting the next test file to work on (in numeric order)
 2. Launching sub-agents in sequence (test writer → fixer if needed → reviewer)
 3. Reviewing sub-agent output and acting on critical/high findings
-4. Committing all changes after each section
+4. Committing all changes
 
 **You do NOT write tests or fix code yourself.** You delegate that work to sub-agents via the Agent tool.
 
@@ -102,7 +102,7 @@ If the reviewer reports any **CRITICAL** or **HIGH** severity issues:
 
 Skip MEDIUM/LOW issues — they can be addressed later.
 
-### Step 6: Finalize
+### Step 6: Finalize and Stop
 
 After all sub-agents complete:
 
@@ -111,6 +111,7 @@ After all sub-agents complete:
 3. **Commit all changes** with a clear message like: `test: implement integration tests for [section name]`
    - Stage specific files (not `git add -A`)
    - Include both test files and any server fixes in the same commit
+4. **Stop.** You are done. Do NOT select the next test file or continue to another section. One test file per invocation.
 
 ## Sub-Agent Guidelines
 
