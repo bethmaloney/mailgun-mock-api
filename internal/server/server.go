@@ -363,6 +363,7 @@ func New(db *gorm.DB) http.Handler {
 		r.Get("/", kh.ListKeys)
 		r.Post("/", kh.CreateKey)
 		r.Get("/public", kh.GetPublicKey)
+		r.Post("/public", kh.RegeneratePublicKey)
 		r.Delete("/{id}", kh.DeleteKey)
 		r.Post("/{id}/regenerate", kh.RegenerateKey)
 	})

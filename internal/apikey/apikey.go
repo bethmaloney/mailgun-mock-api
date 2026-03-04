@@ -41,12 +41,12 @@ type keyResponseDTO struct {
 	Role           string  `json:"role"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
-	ExpiresAt      *string `json:"expires_at"`
-	IsDisabled     bool    `json:"is_disabled"`
-	DisabledReason *string `json:"disabled_reason"`
-	DomainName     *string `json:"domain_name"`
-	Requestor      *string `json:"requestor"`
-	UserName       *string `json:"user_name"`
+	ExpiresAt      string  `json:"expires_at"`
+	IsDisabled     bool   `json:"is_disabled"`
+	DisabledReason string `json:"disabled_reason"`
+	DomainName     string `json:"domain_name"`
+	Requestor      string `json:"requestor"`
+	UserName       string `json:"user_name"`
 }
 
 // keyWithSecretDTO extends keyResponseDTO and includes the secret.
@@ -55,6 +55,18 @@ type keyWithSecretDTO struct {
 	Secret string `json:"secret"`
 }
 
+// derefString returns the value of a *string or "" if nil.
+func derefString(s *string) string {
+	if s != nil {
+		return *s
+	}
+	return ""
+}
+
+// iso8601Format is the timestamp format expected by the Mailgun SDK's ISO8601Time type.
+// It does NOT include a timezone indicator (no "Z" suffix).
+const iso8601Format = "2006-01-02T15:04:05"
+
 // toResponseDTO converts an APIKey model to a keyResponseDTO.
 func toResponseDTO(key APIKey) keyResponseDTO {
 	dto := keyResponseDTO{
@@ -62,17 +74,16 @@ func toResponseDTO(key APIKey) keyResponseDTO {
 		Description:    key.Description,
 		Kind:           key.Kind,
 		Role:           key.Role,
-		CreatedAt:      key.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:      key.UpdatedAt.UTC().Format(time.RFC3339),
+		CreatedAt:      key.CreatedAt.UTC().Format(iso8601Format),
+		UpdatedAt:      key.UpdatedAt.UTC().Format(iso8601Format),
 		IsDisabled:     key.IsDisabled,
-		DisabledReason: key.DisabledReason,
-		DomainName:     key.DomainName,
-		Requestor:      key.Requestor,
-		UserName:       key.UserName,
+		DisabledReason: derefString(key.DisabledReason),
+		DomainName:     derefString(key.DomainName),
+		Requestor:      derefString(key.Requestor),
+		UserName:       derefString(key.UserName),
 	}
 	if key.ExpiresAt != nil {
-		formatted := key.ExpiresAt.UTC().Format(time.RFC3339)
-		dto.ExpiresAt = &formatted
+		dto.ExpiresAt = key.ExpiresAt.UTC().Format(iso8601Format)
 	}
 	return dto
 }
@@ -274,5 +285,14 @@ func (h *Handlers) GetPublicKey(w http.ResponseWriter, r *http.Request) {
 	response.RespondJSON(w, http.StatusOK, map[string]string{
 		"key":     h.publicKey,
 		"message": "public key",
+	})
+}
+
+// RegeneratePublicKey handles POST /v1/keys/public.
+func (h *Handlers) RegeneratePublicKey(w http.ResponseWriter, r *http.Request) {
+	h.publicKey = generateSecret("pubkey-")
+	response.RespondJSON(w, http.StatusOK, map[string]string{
+		"key":     h.publicKey,
+		"message": "public key regenerated",
 	})
 }
