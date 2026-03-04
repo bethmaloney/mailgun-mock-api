@@ -215,10 +215,11 @@ func (h *Handlers) UpdateRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "Route has been updated",
-		"route":   rt.toJSON(),
-	})
+	// SDK unmarshals UpdateRoute response directly into mtypes.Route (no envelope),
+	// so return route fields at the top level alongside message.
+	resp := rt.toJSON()
+	resp["message"] = "Route has been updated"
+	response.RespondJSON(w, http.StatusOK, resp)
 }
 
 // DeleteRoute handles DELETE /v3/routes/{route_id}.

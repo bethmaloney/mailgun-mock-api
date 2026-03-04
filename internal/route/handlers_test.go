@@ -212,9 +212,15 @@ type getRouteResponse struct {
 }
 
 // updateRouteResponse represents the JSON response from PUT /v3/routes/{id}.
+// The SDK expects route fields at the top level (no "route" wrapper).
 type updateRouteResponse struct {
-	Message string    `json:"message"`
-	Route   routeJSON `json:"route"`
+	Message     string   `json:"message"`
+	ID          string   `json:"id"`
+	Priority    int      `json:"priority"`
+	Description string   `json:"description"`
+	Expression  string   `json:"expression"`
+	Actions     []string `json:"actions"`
+	CreatedAt   string   `json:"created_at"`
 }
 
 // deleteRouteResponse represents the JSON response from DELETE /v3/routes/{id}.
@@ -726,26 +732,26 @@ func TestUpdateRoute_Full(t *testing.T) {
 	})
 
 	t.Run("priority updated", func(t *testing.T) {
-		if updateResp.Route.Priority != 10 {
-			t.Errorf("expected priority 10, got %d", updateResp.Route.Priority)
+		if updateResp.Priority != 10 {
+			t.Errorf("expected priority 10, got %d", updateResp.Priority)
 		}
 	})
 
 	t.Run("description updated", func(t *testing.T) {
-		if updateResp.Route.Description != "Updated" {
-			t.Errorf("expected description %q, got %q", "Updated", updateResp.Route.Description)
+		if updateResp.Description != "Updated" {
+			t.Errorf("expected description %q, got %q", "Updated", updateResp.Description)
 		}
 	})
 
 	t.Run("expression updated", func(t *testing.T) {
-		if updateResp.Route.Expression != `match_recipient(".*@new.com")` {
-			t.Errorf("expected expression %q, got %q", `match_recipient(".*@new.com")`, updateResp.Route.Expression)
+		if updateResp.Expression != `match_recipient(".*@new.com")` {
+			t.Errorf("expected expression %q, got %q", `match_recipient(".*@new.com")`, updateResp.Expression)
 		}
 	})
 
 	t.Run("actions updated", func(t *testing.T) {
-		if len(updateResp.Route.Actions) != 2 {
-			t.Fatalf("expected 2 actions, got %d", len(updateResp.Route.Actions))
+		if len(updateResp.Actions) != 2 {
+			t.Fatalf("expected 2 actions, got %d", len(updateResp.Actions))
 		}
 	})
 }
@@ -774,29 +780,29 @@ func TestUpdateRoute_Partial(t *testing.T) {
 	decodeJSON(t, rec, &updateResp)
 
 	t.Run("priority is updated", func(t *testing.T) {
-		if updateResp.Route.Priority != 99 {
-			t.Errorf("expected priority 99, got %d", updateResp.Route.Priority)
+		if updateResp.Priority != 99 {
+			t.Errorf("expected priority 99, got %d", updateResp.Priority)
 		}
 	})
 
 	t.Run("description remains unchanged", func(t *testing.T) {
-		if updateResp.Route.Description != "Original description" {
-			t.Errorf("expected description %q, got %q", "Original description", updateResp.Route.Description)
+		if updateResp.Description != "Original description" {
+			t.Errorf("expected description %q, got %q", "Original description", updateResp.Description)
 		}
 	})
 
 	t.Run("expression remains unchanged", func(t *testing.T) {
-		if updateResp.Route.Expression != `match_recipient(".*@example.com")` {
-			t.Errorf("expected expression %q, got %q", `match_recipient(".*@example.com")`, updateResp.Route.Expression)
+		if updateResp.Expression != `match_recipient(".*@example.com")` {
+			t.Errorf("expected expression %q, got %q", `match_recipient(".*@example.com")`, updateResp.Expression)
 		}
 	})
 
 	t.Run("actions remain unchanged", func(t *testing.T) {
-		if len(updateResp.Route.Actions) != 1 {
-			t.Errorf("expected 1 action, got %d", len(updateResp.Route.Actions))
+		if len(updateResp.Actions) != 1 {
+			t.Errorf("expected 1 action, got %d", len(updateResp.Actions))
 		}
-		if len(updateResp.Route.Actions) > 0 && updateResp.Route.Actions[0] != `forward("http://example.com/webhook")` {
-			t.Errorf("expected action %q, got %q", `forward("http://example.com/webhook")`, updateResp.Route.Actions[0])
+		if len(updateResp.Actions) > 0 && updateResp.Actions[0] != `forward("http://example.com/webhook")` {
+			t.Errorf("expected action %q, got %q", `forward("http://example.com/webhook")`, updateResp.Actions[0])
 		}
 	})
 }
@@ -844,14 +850,14 @@ func TestUpdateRoute_Actions(t *testing.T) {
 	decodeJSON(t, rec, &updateResp)
 
 	t.Run("actions updated to two entries", func(t *testing.T) {
-		if len(updateResp.Route.Actions) != 2 {
-			t.Fatalf("expected 2 actions after update, got %d: %v", len(updateResp.Route.Actions), updateResp.Route.Actions)
+		if len(updateResp.Actions) != 2 {
+			t.Fatalf("expected 2 actions after update, got %d: %v", len(updateResp.Actions), updateResp.Actions)
 		}
-		if updateResp.Route.Actions[0] != `store(notify="http://example.com/notify")` {
-			t.Errorf("expected first action %q, got %q", `store(notify="http://example.com/notify")`, updateResp.Route.Actions[0])
+		if updateResp.Actions[0] != `store(notify="http://example.com/notify")` {
+			t.Errorf("expected first action %q, got %q", `store(notify="http://example.com/notify")`, updateResp.Actions[0])
 		}
-		if updateResp.Route.Actions[1] != `stop()` {
-			t.Errorf("expected second action %q, got %q", `stop()`, updateResp.Route.Actions[1])
+		if updateResp.Actions[1] != `stop()` {
+			t.Errorf("expected second action %q, got %q", `stop()`, updateResp.Actions[1])
 		}
 	})
 }
