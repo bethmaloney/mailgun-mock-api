@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -85,6 +86,14 @@ func parseVars(varsStr string) map[string]interface{} {
 		return map[string]interface{}{}
 	}
 	return result
+}
+
+func decodeParam(s string) string {
+	decoded, err := url.PathUnescape(s)
+	if err != nil {
+		return s
+	}
+	return decoded
 }
 
 func parseBool(s string) bool {
@@ -185,15 +194,21 @@ func (h *Handlers) CreateList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondJSON(w, http.StatusCreated, map[string]interface{}{
+	listItem := formatListItem(ml)
+	resp := map[string]interface{}{
 		"message": "Mailing list has been created",
-		"list":    formatListItem(ml),
-	})
+		"list":    listItem,
+	}
+	// Include top-level fields so the mailgun-go SDK can parse them directly
+	for k, v := range listItem {
+		resp[k] = v
+	}
+	response.RespondJSON(w, http.StatusOK, resp)
 }
 
 // GetList handles GET /v3/lists/{list_address}
 func (h *Handlers) GetList(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
 
 	var ml MailingList
 	if err := h.db.Where("address = ?", listAddress).First(&ml).Error; err != nil {
@@ -208,7 +223,7 @@ func (h *Handlers) GetList(w http.ResponseWriter, r *http.Request) {
 
 // UpdateList handles PUT /v3/lists/{list_address}
 func (h *Handlers) UpdateList(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
 
 	var ml MailingList
 	if err := h.db.Where("address = ?", listAddress).First(&ml).Error; err != nil {
@@ -260,15 +275,21 @@ func (h *Handlers) UpdateList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
+	listItem := formatListItem(ml)
+	resp := map[string]interface{}{
 		"message": "Mailing list has been updated",
-		"list":    formatListItem(ml),
-	})
+		"list":    listItem,
+	}
+	// Include top-level fields so the mailgun-go SDK can parse them directly
+	for k, v := range listItem {
+		resp[k] = v
+	}
+	response.RespondJSON(w, http.StatusOK, resp)
 }
 
 // DeleteList handles DELETE /v3/lists/{list_address}
 func (h *Handlers) DeleteList(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
 
 	var ml MailingList
 	if err := h.db.Where("address = ?", listAddress).First(&ml).Error; err != nil {
@@ -403,7 +424,7 @@ func (h *Handlers) ListListsLegacy(w http.ResponseWriter, r *http.Request) {
 
 // AddMember handles POST /v3/lists/{list_address}/members
 func (h *Handlers) AddMember(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
 
 	var ml MailingList
 	if err := h.db.Where("address = ?", listAddress).First(&ml).Error; err != nil {
@@ -491,8 +512,8 @@ func (h *Handlers) AddMember(w http.ResponseWriter, r *http.Request) {
 
 // GetMember handles GET /v3/lists/{list_address}/members/{member_address}
 func (h *Handlers) GetMember(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
-	memberAddress := chi.URLParam(r, "member_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
+	memberAddress := decodeParam(chi.URLParam(r, "member_address"))
 
 	var member MailingListMember
 	if err := h.db.Where("list_address = ? AND address = ?", listAddress, memberAddress).First(&member).Error; err != nil {
@@ -508,8 +529,8 @@ func (h *Handlers) GetMember(w http.ResponseWriter, r *http.Request) {
 
 // UpdateMember handles PUT /v3/lists/{list_address}/members/{member_address}
 func (h *Handlers) UpdateMember(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
-	memberAddress := chi.URLParam(r, "member_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
+	memberAddress := decodeParam(chi.URLParam(r, "member_address"))
 
 	var member MailingListMember
 	if err := h.db.Where("list_address = ? AND address = ?", listAddress, memberAddress).First(&member).Error; err != nil {
@@ -544,8 +565,8 @@ func (h *Handlers) UpdateMember(w http.ResponseWriter, r *http.Request) {
 
 // DeleteMember handles DELETE /v3/lists/{list_address}/members/{member_address}
 func (h *Handlers) DeleteMember(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
-	memberAddress := chi.URLParam(r, "member_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
+	memberAddress := decodeParam(chi.URLParam(r, "member_address"))
 
 	var member MailingListMember
 	if err := h.db.Where("list_address = ? AND address = ?", listAddress, memberAddress).First(&member).Error; err != nil {
@@ -574,7 +595,7 @@ func (h *Handlers) DeleteMember(w http.ResponseWriter, r *http.Request) {
 
 // ListMembers handles GET /v3/lists/{list_address}/members/pages (cursor-based)
 func (h *Handlers) ListMembers(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
 	cp := pagination.ParseCursorParams(r)
 
 	query := h.db.Where("list_address = ?", listAddress)
@@ -648,7 +669,7 @@ func (h *Handlers) ListMembers(w http.ResponseWriter, r *http.Request) {
 
 // ListMembersLegacy handles GET /v3/lists/{list_address}/members (offset-based)
 func (h *Handlers) ListMembersLegacy(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
 	sl := pagination.ParseSkipLimitParams(r, 100, 100)
 
 	query := h.db.Where("list_address = ?", listAddress)
@@ -687,7 +708,7 @@ func (h *Handlers) ListMembersLegacy(w http.ResponseWriter, r *http.Request) {
 
 // BulkAddMembers handles POST /v3/lists/{list_address}/members.json
 func (h *Handlers) BulkAddMembers(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
 
 	var ml MailingList
 	if err := h.db.Where("address = ?", listAddress).First(&ml).Error; err != nil {
@@ -826,7 +847,7 @@ func csvField(record []string, colIndex map[string]int, name string) string {
 
 // CSVImportMembers handles POST /v3/lists/{list_address}/members.csv
 func (h *Handlers) CSVImportMembers(w http.ResponseWriter, r *http.Request) {
-	listAddress := chi.URLParam(r, "list_address")
+	listAddress := decodeParam(chi.URLParam(r, "list_address"))
 
 	var ml MailingList
 	if err := h.db.Where("address = ?", listAddress).First(&ml).Error; err != nil {
