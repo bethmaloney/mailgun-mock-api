@@ -34,6 +34,10 @@ integration section="":
         go test ./tests/integration/ -run "Test{{section}}" -v; \
     fi
 
+# Run Playwright e2e tests (builds first, starts server automatically)
+e2e:
+    cd web && npm run test:e2e
+
 # Remove build artifacts
 clean:
     rm -rf mailgun-mock-api

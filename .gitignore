@@ -22,3 +22,8 @@ web/node_modules/
 
 # Embedded static files (copied from web/dist during build)
 internal/server/static/
+
+# Playwright
+web/e2e/.server.pid
+web/test-results/
+web/playwright-report/

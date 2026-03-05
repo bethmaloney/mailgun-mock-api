@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
 	"github.com/go-chi/chi/v5"
@@ -175,10 +176,55 @@ func mergeJSON(raw json.RawMessage, target interface{}) error {
 	return json.Unmarshal(raw, target)
 }
 
-// ResetAll resets all stored data but preserves configuration.
+// resetTables is the list of all tables to truncate on reset,
+// ordered children-first to respect foreign key constraints.
+var resetTables = []string{
+	// Children / join tables first
+	"sending_limits",
+	"ip_pool_ips",
+	"domain_ips",
+	"domain_pools",
+	"dns_records",
+	"smtp_credentials",
+	"attachments",
+	"template_versions",
+	"mailing_list_members",
+	"webhook_deliveries",
+	// Then parents / standalone tables
+	"events",
+	"stored_messages",
+	"bounces",
+	"complaints",
+	"unsubscribes",
+	"allowlist_entries",
+	"templates",
+	"tags",
+	"mailing_lists",
+	"domain_webhooks",
+	"account_webhooks",
+	"routes",
+	"api_keys",
+	"ip_allowlist_entries",
+	"ips",
+	"ip_pools",
+	"subaccounts",
+	"domains",
+}
+
+// ResetAll clears all stored data and resets configuration to defaults.
 func (h *Handlers) ResetAll(w http.ResponseWriter, r *http.Request) {
-	// TODO: Clear stored messages, events, and other data from the database.
-	// Config is intentionally NOT reset.
+	for _, table := range resetTables {
+		if err := h.db.Exec("DELETE FROM " + table).Error; err != nil {
+			// Skip tables that don't exist (e.g. in test DBs without full migrations).
+			if strings.Contains(err.Error(), "no such table") {
+				continue
+			}
+			response.RespondError(w, http.StatusInternalServerError,
+				fmt.Sprintf("failed to clear table %s: %v", table, err))
+			return
+		}
+	}
+	h.config = defaultConfig()
 	response.RespondSuccess(w, "All data has been reset")
 }
 
@@ -189,8 +235,17 @@ func (h *Handlers) ResetDomain(w http.ResponseWriter, r *http.Request) {
 	response.RespondSuccess(w, fmt.Sprintf("Data for domain %s has been reset", domain))
 }
 
-// ResetMessages resets all stored messages and events.
+// ResetMessages clears all stored messages and events.
 func (h *Handlers) ResetMessages(w http.ResponseWriter, r *http.Request) {
-	// TODO: Clear stored messages and events from the database.
+	for _, table := range []string{"attachments", "events", "stored_messages"} {
+		if err := h.db.Exec("DELETE FROM " + table).Error; err != nil {
+			if strings.Contains(err.Error(), "no such table") {
+				continue
+			}
+			response.RespondError(w, http.StatusInternalServerError,
+				fmt.Sprintf("failed to clear table %s: %v", table, err))
+			return
+		}
+	}
 	response.RespondSuccess(w, "Messages and events have been reset")
 }

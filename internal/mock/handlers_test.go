@@ -672,7 +672,7 @@ func TestResetMessages(t *testing.T) {
 // Reset does not affect config
 // ---------------------------------------------------------------------------
 
-func TestResetAll_DoesNotAffectConfig(t *testing.T) {
+func TestResetAll_ResetsConfig(t *testing.T) {
 	db := setupTestDB(t)
 	h := mock.NewHandlers(db)
 	router := setupRouter(h)
@@ -697,7 +697,7 @@ func TestResetAll_DoesNotAffectConfig(t *testing.T) {
 		t.Fatalf("POST reset failed with status %d", resetRec.Code)
 	}
 
-	// Verify config is still updated (reset should not affect config)
+	// Verify config is reset to defaults
 	getReq := httptest.NewRequest(http.MethodGet, "/mock/config", nil)
 	getRec := httptest.NewRecorder()
 	router.ServeHTTP(getRec, getReq)
@@ -714,8 +714,8 @@ func TestResetAll_DoesNotAffectConfig(t *testing.T) {
 		t.Fatalf("failed to decode event_generation: %v", err)
 	}
 
-	// Config should retain the updated value after reset
-	if eg.AutoDeliver != false {
-		t.Errorf("expected auto_deliver=false to persist after reset, got %v", eg.AutoDeliver)
+	// Config should be reset to default (auto_deliver=true)
+	if eg.AutoDeliver != true {
+		t.Errorf("expected auto_deliver=true (default) after reset, got %v", eg.AutoDeliver)
 	}
 }
