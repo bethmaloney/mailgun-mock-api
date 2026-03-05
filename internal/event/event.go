@@ -12,6 +12,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/bethmaloney/mailgun-mock-api/internal/pagination"
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
+	ws "github.com/bethmaloney/mailgun-mock-api/internal/websocket"
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
@@ -95,6 +96,12 @@ func (unsubscribeLookup) TableName() string { return "unsubscribes" }
 type Handlers struct {
 	db     *gorm.DB
 	config *mock.MockConfig
+	hub    *ws.Hub
+}
+
+// SetHub sets the WebSocket hub used for broadcasting events.
+func (h *Handlers) SetHub(hub *ws.Hub) {
+	h.hub = hub
 }
 
 // NewHandlers creates a new Handlers instance. It resets event data in the
@@ -102,6 +109,16 @@ type Handlers struct {
 func NewHandlers(db *gorm.DB, config *mock.MockConfig) *Handlers {
 	db.Unscoped().Where("1 = 1").Delete(&Event{})
 	return &Handlers{db: db, config: config}
+}
+
+// broadcastEventNew sends an event.new WebSocket message if a hub is configured.
+func (h *Handlers) broadcastEventNew(domainName, eventType string) {
+	if h.hub != nil {
+		h.hub.Broadcast <- ws.BroadcastMessage{
+			Type: "event.new",
+			Data: map[string]string{"domain": domainName, "event": eventType},
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +331,11 @@ func (h *Handlers) GenerateAcceptedEvent(domainName, messageID, storageKey, from
 	payloadJSON, _ := json.Marshal(payload)
 	ev.Payload = string(payloadJSON)
 
-	return h.db.Create(&ev).Error
+	if err := h.db.Create(&ev).Error; err != nil {
+		return err
+	}
+	h.broadcastEventNew(domainName, "accepted")
+	return nil
 }
 
 // GenerateDeliveryEvent creates a "delivered" event for a recipient. It is
@@ -354,7 +375,11 @@ func (h *Handlers) GenerateDeliveryEvent(domainName, messageID, storageKey, from
 	payloadJSON, _ := json.Marshal(payload)
 	ev.Payload = string(payloadJSON)
 
-	return h.db.Create(&ev).Error
+	if err := h.db.Create(&ev).Error; err != nil {
+		return err
+	}
+	h.broadcastEventNew(domainName, "delivered")
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -465,7 +490,11 @@ func (h *Handlers) GenerateSuppressionFailedEvent(domainName, messageID, storage
 	payloadJSON, _ := json.Marshal(payload)
 	ev.Payload = string(payloadJSON)
 
-	return h.db.Create(&ev).Error
+	if err := h.db.Create(&ev).Error; err != nil {
+		return err
+	}
+	h.broadcastEventNew(domainName, "failed")
+	return nil
 }
 
 // ---------------------------------------------------------------------------

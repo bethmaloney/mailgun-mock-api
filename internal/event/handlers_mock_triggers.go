@@ -98,6 +98,8 @@ func (h *Handlers) createAndSaveEvent(w http.ResponseWriter, ev Event, payload m
 		return
 	}
 
+	h.broadcastEventNew(domainName, ev.EventType)
+
 	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"message":  "Event created",
 		"event_id": ev.ID,

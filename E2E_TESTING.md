@@ -52,18 +52,18 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Clear all messages — click clear all, confirm, verify table empty
 - [x] Auto-refreshes on WebSocket `message.new` — send message while viewing page, verify it appears
 
-### `events.spec.ts`
-- [ ] Shows empty state with domain selector — no events before domain selected
-- [ ] Domain selector populated — create domains, verify dropdown contains them
-- [ ] Lists events after selecting domain — send message + trigger events, select domain, verify event rows
-- [ ] Event type shown as status badge — verify color-coded badge for different event types
-- [ ] Filter by event type — filter to only "delivered" events
-- [ ] Filter by recipient — filter events by recipient address
-- [ ] Combined filters — apply event type + recipient filter
-- [ ] Expand event detail — click event row, verify full JSON in pre block
-- [ ] Collapse event detail — click expanded event again to collapse
-- [ ] Pagination — generate enough events, verify next/previous navigation
-- [ ] Auto-refreshes on WebSocket `event.new` — trigger event while viewing, verify it appears
+### `events.spec.ts` ✅
+- [x] Shows empty state with domain selector — no events before domain selected
+- [x] Domain selector populated — create domains, verify dropdown contains them
+- [x] Lists events after selecting domain — send message + trigger events, select domain, verify event rows
+- [x] Event type shown as status badge — verify color-coded badge for different event types
+- [x] Filter by event type — filter to only "delivered" events
+- [x] Filter by recipient — filter events by recipient address
+- [x] Combined filters — apply event type + recipient filter
+- [x] Expand event detail — click event row, verify full JSON in pre block
+- [x] Collapse event detail — click expanded event again to collapse
+- [x] Pagination — generate enough events, verify next/previous navigation
+- [x] Auto-refreshes on WebSocket `event.new` — trigger event while viewing, verify it appears
 
 ### `templates.spec.ts`
 - [ ] Shows empty state — no templates for selected domain
