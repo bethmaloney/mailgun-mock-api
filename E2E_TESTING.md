@@ -129,18 +129,18 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Collapse delivery detail — click again to collapse
 - [x] Delivery log pagination — verify pagination with many deliveries
 
-### `settings.spec.ts`
-- [ ] Loads current configuration — all settings sections display current values
-- [ ] Event Generation — save settings — change auto_deliver, delivery_delay_ms, etc., save, verify success
-- [ ] Domain Behavior — save settings — toggle domain_auto_verify, change sandbox_domain, save
-- [ ] Webhook Delivery — save settings — change webhook_retry_mode, webhook_timeout_ms, save
-- [ ] Authentication — save settings — change auth_mode, verify signing_key is read-only
-- [ ] Storage — save settings — toggle store_attachment_bytes, change max_messages, max_events, save
-- [ ] Success message auto-hides — verify success message disappears after ~3 seconds
-- [ ] Reset All Data — click reset all, confirm, verify success
-- [ ] Reset Messages & Events — click reset messages, confirm, verify success
-- [ ] Reset Per Domain — select domain, click reset, confirm, verify success
-- [ ] Cancel reset confirmation — click reset, cancel dialog, verify no reset occurred
+### `settings.spec.ts` ✅
+- [x] Loads current configuration — all settings sections display current values
+- [x] Event Generation — save settings — change auto_deliver, delivery_delay_ms, etc., save, verify success
+- [x] Domain Behavior — save settings — toggle domain_auto_verify, change sandbox_domain, save
+- [x] Webhook Delivery — save settings — change webhook_retry_mode, webhook_timeout_ms, save
+- [x] Authentication — save settings — change auth_mode, verify signing_key is read-only
+- [x] Storage — save settings — toggle store_attachment_bytes, change max_messages, max_events, save
+- [x] Success message auto-hides — verify success message disappears after ~3 seconds
+- [x] Reset All Data — click reset all, confirm, verify success
+- [x] Reset Messages & Events — click reset messages, confirm, verify success
+- [x] Reset Per Domain — select domain, click reset, confirm, verify success
+- [x] Cancel reset confirmation — click reset, cancel dialog, verify no reset occurred
 
 ### `trigger-events.spec.ts`
 - [ ] 3-step workflow visibility — only domain selector visible initially
