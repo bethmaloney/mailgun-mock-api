@@ -19,6 +19,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
 	"github.com/bethmaloney/mailgun-mock-api/internal/tag"
+	ws "github.com/bethmaloney/mailgun-mock-api/internal/websocket"
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
@@ -88,6 +89,12 @@ type Handlers struct {
 	db            *gorm.DB
 	config        *mock.MockConfig
 	eventHandlers *event.Handlers
+	hub           *ws.Hub
+}
+
+// SetHub sets the WebSocket hub used for broadcasting events.
+func (h *Handlers) SetHub(hub *ws.Hub) {
+	h.hub = hub
 }
 
 // NewHandlers creates a new Handlers instance. Event handlers are automatically
@@ -350,6 +357,13 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 					tagsJSON, string(customVariablesJSON),
 				)
 			}
+		}
+	}
+
+	if h.hub != nil {
+		h.hub.Broadcast <- ws.BroadcastMessage{
+			Type: "message.new",
+			Data: map[string]string{"id": messageID, "domain": domainName},
 		}
 	}
 

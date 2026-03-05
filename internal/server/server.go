@@ -106,6 +106,10 @@ func New(db *gorm.DB) http.Handler {
 	mh := message.NewHandlers(db, h.Config())
 	mh.SetEventHandlers(eh)
 
+	// Wire up WebSocket broadcasting
+	h.SetHub(hub)
+	mh.SetHub(hub)
+
 	// Metrics handlers
 	mtrH := metrics.NewHandlers(db)
 

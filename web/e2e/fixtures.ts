@@ -149,6 +149,43 @@ export class ApiHelper {
     if (!res.ok) throw new Error(`createMailingList failed: ${res.status} ${await res.text()}`);
     return res.json();
   }
+
+  /** Trigger a mock event for a message. */
+  async triggerEvent(
+    domain: string,
+    action: string,
+    storageKey: string,
+    body?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const res = await this.request(
+      "POST",
+      `/mock/events/${domain}/${action}/${storageKey}`,
+      body,
+    );
+    if (!res.ok) throw new Error(`triggerEvent failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  /** Trigger a webhook delivery via the mock API. */
+  async triggerWebhook(opts: {
+    domain: string;
+    event_type: string;
+    recipient?: string;
+    message_id?: string;
+  }): Promise<Record<string, unknown>> {
+    const res = await this.request("POST", "/mock/webhooks/trigger", opts);
+    if (!res.ok) throw new Error(`triggerWebhook failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  /** Update mock configuration. */
+  async updateConfig(
+    config: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const res = await this.request("PUT", "/mock/config", config);
+    if (!res.ok) throw new Error(`updateConfig failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
 }
 
 export const test = base.extend<{ api: ApiHelper }>({

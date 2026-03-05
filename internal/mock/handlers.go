@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
+	ws "github.com/bethmaloney/mailgun-mock-api/internal/websocket"
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
@@ -93,6 +94,12 @@ func defaultConfig() MockConfig {
 type Handlers struct {
 	db     *gorm.DB
 	config MockConfig
+	hub    *ws.Hub
+}
+
+// SetHub sets the WebSocket hub used for broadcasting events.
+func (h *Handlers) SetHub(hub *ws.Hub) {
+	h.hub = hub
 }
 
 // NewHandlers creates a new Handlers instance with default configuration.
@@ -226,6 +233,9 @@ func (h *Handlers) ResetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	h.config = defaultConfig()
 	response.RespondSuccess(w, "All data has been reset")
+	if h.hub != nil {
+		h.hub.Broadcast <- ws.BroadcastMessage{Type: "data.reset", Data: nil}
+	}
 }
 
 // ResetDomain resets data for a specific domain.

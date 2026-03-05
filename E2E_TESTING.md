@@ -20,15 +20,15 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 
 ## Tests Needed
 
-### `dashboard.spec.ts`
-- [ ] Shows zero-state when no data exists — all counts show 0, no recent deliveries
-- [ ] Shows message statistics — send messages via API, verify total and last-hour counts
-- [ ] Shows domain statistics — create domains (some verified, some not), verify total/active/unverified counts
-- [ ] Shows webhook count — create webhooks via API, verify configured count
-- [ ] Shows event statistics — trigger events via API, verify accepted/delivered/failed/opened/clicked/complained/unsubscribed counts
-- [ ] Shows recent webhook deliveries table — create webhook + send message, verify delivery row with URL, event, status code, timestamp
-- [ ] Auto-refreshes on WebSocket `message.new` — send message while on dashboard, verify counts update without manual refresh
-- [ ] Auto-refreshes on WebSocket `data.reset` — populate data, reset via API, verify counts return to 0
+### `dashboard.spec.ts` ✅
+- [x] Shows zero-state when no data exists — all counts show 0, no recent deliveries
+- [x] Shows message statistics — send messages via API, verify total and last-hour counts
+- [x] Shows domain statistics — create domains (some verified, some not), verify total/active/unverified counts
+- [x] Shows webhook count — create webhooks via API, verify configured count
+- [x] Shows event statistics — trigger events via API, verify accepted/delivered/failed/opened/clicked/complained/unsubscribed counts
+- [x] Shows recent webhook deliveries table — create webhook + send message, verify delivery row with URL, event, status code, timestamp
+- [x] Auto-refreshes on WebSocket `message.new` — send message while on dashboard, verify counts update without manual refresh
+- [x] Auto-refreshes on WebSocket `data.reset` — populate data, reset via API, verify counts return to 0
 
 ### `messages.spec.ts`
 - [ ] Shows empty state — "No data available" when no messages
