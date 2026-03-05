@@ -169,9 +169,9 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Result shows actions executed — verify actions section when routes match
 - [x] Reset form — fill form, click reset, verify all fields cleared
 
-### `shared-components.spec.ts`
-- [ ] DataTable loading state — verify "Loading..." shown during fetch
-- [ ] DataTable empty state — verify "No data available" when rows empty
-- [ ] StatusBadge colors — verify correct colors for delivered (green), opened (blue), failed (red), unsubscribed (orange)
-- [ ] Pagination disabled states — Previous disabled on first page, Next disabled on last page
-- [ ] WebSocket connection indicator — verify green dot when connected in sidebar
+### `shared-components.spec.ts` ✅
+- [x] DataTable loading state — verify "Loading..." shown during fetch
+- [x] DataTable empty state — verify "No data available" when rows empty
+- [x] StatusBadge colors — verify correct colors for delivered (green), opened (blue), failed (red), unsubscribed (orange)
+- [x] Pagination disabled states — Previous disabled on first page, Next disabled on last page
+- [x] WebSocket connection indicator — verify green dot when connected in sidebar
