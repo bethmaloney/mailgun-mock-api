@@ -65,16 +65,16 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Pagination — generate enough events, verify next/previous navigation
 - [x] Auto-refreshes on WebSocket `event.new` — trigger event while viewing, verify it appears
 
-### `templates.spec.ts`
-- [ ] Shows empty state — no templates for selected domain
-- [ ] Domain selector populated — verify domains appear in dropdown
-- [ ] Lists templates — create templates via API, verify table shows name, description, created_at
-- [ ] View template detail — click template name, verify detail panel with name, description, active version
-- [ ] View versions list in detail — verify versions table with tag, engine, active, comment
-- [ ] View version detail — click version tag, verify version detail with template body
-- [ ] Delete template — click delete, confirm, verify removed
-- [ ] Pagination for templates — verify pagination with many templates
-- [ ] Pagination for versions — verify pagination with many versions
+### `templates.spec.ts` ✅
+- [x] Shows empty state — no templates for selected domain
+- [x] Domain selector populated — verify domains appear in dropdown
+- [x] Lists templates — create templates via API, verify table shows name, description, created_at
+- [x] View template detail — click template name, verify detail panel with name, description, active version
+- [x] View versions list in detail — verify versions table with tag, engine, active, comment
+- [x] View version detail — click version tag, verify version detail with template body
+- [x] Delete template — click delete, confirm, verify removed
+- [x] Pagination for templates — verify pagination with many templates
+- [x] Pagination for versions — verify pagination with many versions
 
 ### `mailing-lists.spec.ts`
 - [ ] Shows empty state — no mailing lists displayed

@@ -263,6 +263,57 @@ export class ApiHelper {
     if (!res.ok) throw new Error(`updateConfig failed: ${res.status} ${await res.text()}`);
     return res.json();
   }
+
+  /** Create a template via the Mailgun API. */
+  async createTemplate(
+    domain: string,
+    opts: {
+      name: string;
+      description?: string;
+      template?: string;
+      tag?: string;
+      engine?: string;
+      comment?: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    const fields: Record<string, string> = { name: opts.name };
+    if (opts.description) fields.description = opts.description;
+    if (opts.template) fields.template = opts.template;
+    if (opts.tag) fields.tag = opts.tag;
+    if (opts.engine) fields.engine = opts.engine;
+    if (opts.comment) fields.comment = opts.comment;
+    const res = await this.formRequest("POST", `/v3/${domain}/templates`, fields);
+    if (!res.ok) throw new Error(`createTemplate failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  /** Create a template version via the Mailgun API. */
+  async createTemplateVersion(
+    domain: string,
+    templateName: string,
+    opts: {
+      template: string;
+      tag: string;
+      engine?: string;
+      comment?: string;
+      active?: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    const fields: Record<string, string> = {
+      template: opts.template,
+      tag: opts.tag,
+    };
+    if (opts.engine) fields.engine = opts.engine;
+    if (opts.comment) fields.comment = opts.comment;
+    if (opts.active) fields.active = opts.active;
+    const res = await this.formRequest(
+      "POST",
+      `/v3/${domain}/templates/${templateName}/versions`,
+      fields,
+    );
+    if (!res.ok) throw new Error(`createTemplateVersion failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
 }
 
 export const test = base.extend<{ api: ApiHelper }>({

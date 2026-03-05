@@ -54,8 +54,8 @@ interface TemplateDetailResponse {
 interface TemplateVersionsResponse {
   template: {
     name: string;
+    versions: TemplateVersion[];
   };
-  items: TemplateVersion[];
   paging: TemplatePaging;
 }
 
@@ -250,7 +250,7 @@ async function fetchVersions(pagingUrl?: string) {
   try {
     const url = buildVersionsUrl(pagingUrl);
     const resp = await api.get<TemplateVersionsResponse>(url);
-    versions.value = resp.items || [];
+    versions.value = resp.template?.versions || [];
     versionsPaging.value = resp.paging || {};
   } catch (e: unknown) {
     const err = e as { message?: string };
