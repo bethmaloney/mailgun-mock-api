@@ -159,15 +159,15 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Trigger complain event — trigger, verify success
 - [x] Error result displayed — trigger event that fails, verify error badge
 
-### `simulate-inbound.spec.ts`
-- [ ] Form shows required fields — from, to, subject visible, submit button disabled
-- [ ] Domain selector auto-populates To field — select domain, verify To updates
-- [ ] Submit button disabled until required fields filled
-- [ ] Simulate inbound message — fill form, submit, verify result panel
-- [ ] Result shows matched routes — create route via API, simulate, verify matched routes
-- [ ] Result shows "no routes matched" — simulate without matching routes, verify info message
-- [ ] Result shows actions executed — verify actions section when routes match
-- [ ] Reset form — fill form, click reset, verify all fields cleared
+### `simulate-inbound.spec.ts` ✅
+- [x] Form shows required fields — from, to, subject visible, submit button disabled
+- [x] Domain selector auto-populates To field — select domain, verify To updates
+- [x] Submit button disabled until required fields filled
+- [x] Simulate inbound message — fill form, submit, verify result panel
+- [x] Result shows matched routes — create route via API, simulate, verify matched routes
+- [x] Result shows "no routes matched" — simulate without matching routes, verify info message
+- [x] Result shows actions executed — verify actions section when routes match
+- [x] Reset form — fill form, click reset, verify all fields cleared
 
 ### `shared-components.spec.ts`
 - [ ] DataTable loading state — verify "Loading..." shown during fetch
