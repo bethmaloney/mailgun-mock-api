@@ -30,27 +30,27 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Auto-refreshes on WebSocket `message.new` — send message while on dashboard, verify counts update without manual refresh
 - [x] Auto-refreshes on WebSocket `data.reset` — populate data, reset via API, verify counts return to 0
 
-### `messages.spec.ts`
-- [ ] Shows empty state — "No data available" when no messages
-- [ ] Lists messages after sending — send messages via API, verify table rows (from, to, subject, domain, status, date)
-- [ ] Shows tags in table — send message with tags, verify tags display
-- [ ] Filter by domain — send messages to different domains, filter by one domain, verify only matching shown
-- [ ] Filter by from — filter messages by sender address
-- [ ] Filter by to — filter messages by recipient
-- [ ] Filter by subject — filter by subject text
-- [ ] Combined filters — apply multiple filters simultaneously
-- [ ] Pagination — send enough messages to paginate, verify next/previous buttons work
-- [ ] View message detail — click subject, verify detail panel shows from, to, subject, domain, message ID, storage key
-- [ ] Detail shows text body — send message with text body, verify text body section
-- [ ] Detail shows HTML body in iframe — send message with HTML body, verify iframe preview
-- [ ] Detail shows custom headers — send message with h:X-Custom header, verify JSON display
-- [ ] Detail shows custom variables — send message with v:vars, verify JSON display
-- [ ] Detail shows attachments — send message with attachment, verify attachment list with filename, type, size
-- [ ] Detail shows events timeline — trigger events on a message, verify events with status badges
-- [ ] Close detail by clicking again — click subject to open, click again to close
-- [ ] Delete individual message — click delete icon, confirm dialog, verify removed
-- [ ] Clear all messages — click clear all, confirm, verify table empty
-- [ ] Auto-refreshes on WebSocket `message.new` — send message while viewing page, verify it appears
+### `messages.spec.ts` ✅
+- [x] Shows empty state — "No data available" when no messages
+- [x] Lists messages after sending — send messages via API, verify table rows (from, to, subject, domain, status, date)
+- [x] Shows tags in table — send message with tags, verify tags display
+- [x] Filter by domain — send messages to different domains, filter by one domain, verify only matching shown
+- [x] Filter by from — filter messages by sender address
+- [x] Filter by to — filter messages by recipient
+- [x] Filter by subject — filter by subject text
+- [x] Combined filters — apply multiple filters simultaneously
+- [x] Pagination — send enough messages to paginate, verify next/previous buttons work
+- [x] View message detail — click subject, verify detail panel shows from, to, subject, domain, message ID, storage key
+- [x] Detail shows text body — send message with text body, verify text body section
+- [x] Detail shows HTML body in iframe — send message with HTML body, verify iframe preview
+- [x] Detail shows custom headers — send message with h:X-Custom header, verify JSON display
+- [x] Detail shows custom variables — send message with v:vars, verify JSON display
+- [x] Detail shows attachments — send message with attachment, verify attachment list with filename, type, size
+- [x] Detail shows events timeline — trigger events on a message, verify events with status badges
+- [x] Close detail by clicking again — click subject to open, click again to close
+- [x] Delete individual message — click delete icon, confirm dialog, verify removed
+- [x] Clear all messages — click clear all, confirm, verify table empty
+- [x] Auto-refreshes on WebSocket `message.new` — send message while viewing page, verify it appears
 
 ### `events.spec.ts`
 - [ ] Shows empty state with domain selector — no events before domain selected

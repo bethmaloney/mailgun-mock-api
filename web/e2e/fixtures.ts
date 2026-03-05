@@ -178,6 +178,83 @@ export class ApiHelper {
     return res.json();
   }
 
+  /** Send a message with extra fields (tags, custom headers, custom variables). */
+  async sendMessageWithExtras(
+    domain: string,
+    opts: {
+      from: string;
+      to: string;
+      subject: string;
+      text?: string;
+      html?: string;
+      tags?: string[];
+      headers?: Record<string, string>;
+      variables?: Record<string, string>;
+    },
+  ): Promise<Record<string, unknown>> {
+    const form = new URLSearchParams();
+    form.append("from", opts.from);
+    form.append("to", opts.to);
+    form.append("subject", opts.subject);
+    if (opts.text) form.append("text", opts.text);
+    if (opts.html) form.append("html", opts.html);
+    if (opts.tags) {
+      for (const tag of opts.tags) {
+        form.append("o:tag", tag);
+      }
+    }
+    if (opts.headers) {
+      for (const [k, v] of Object.entries(opts.headers)) {
+        form.append(`h:${k}`, v);
+      }
+    }
+    if (opts.variables) {
+      for (const [k, v] of Object.entries(opts.variables)) {
+        form.append(`v:${k}`, v);
+      }
+    }
+    const res = await fetch(`${API_BASE}/v3/${domain}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: AUTH_HEADER,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: form.toString(),
+    });
+    if (!res.ok) throw new Error(`sendMessageWithExtras failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  /** Send a message with a file attachment via multipart form. */
+  async sendMessageWithAttachment(
+    domain: string,
+    opts: {
+      from: string;
+      to: string;
+      subject: string;
+      text?: string;
+      filename: string;
+      contentType: string;
+      content: Buffer;
+    },
+  ): Promise<Record<string, unknown>> {
+    const formData = new FormData();
+    formData.append("from", opts.from);
+    formData.append("to", opts.to);
+    formData.append("subject", opts.subject);
+    if (opts.text) formData.append("text", opts.text);
+    formData.append("attachment", new Blob([opts.content], { type: opts.contentType }), opts.filename);
+    const res = await fetch(`${API_BASE}/v3/${domain}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: AUTH_HEADER,
+      },
+      body: formData,
+    });
+    if (!res.ok) throw new Error(`sendMessageWithAttachment failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
   /** Update mock configuration. */
   async updateConfig(
     config: Record<string, unknown>,

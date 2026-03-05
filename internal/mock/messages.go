@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -295,7 +296,8 @@ func (h *Handlers) ListMessages(w http.ResponseWriter, r *http.Request) {
 
 // GetMessageDetail handles GET /mock/messages/{message_id} -- full message detail for the Web UI.
 func (h *Handlers) GetMessageDetail(w http.ResponseWriter, r *http.Request) {
-	storageKey := chi.URLParam(r, "message_id")
+	rawKey := chi.URLParam(r, "message_id")
+	storageKey, _ := url.PathUnescape(rawKey)
 
 	var msg storedMessageLookup
 	if err := h.db.Where("storage_key = ?", storageKey).First(&msg).Error; err != nil {
@@ -353,7 +355,8 @@ func (h *Handlers) GetMessageDetail(w http.ResponseWriter, r *http.Request) {
 
 // DeleteSingleMessage handles DELETE /mock/messages/{message_id} -- delete a single message.
 func (h *Handlers) DeleteSingleMessage(w http.ResponseWriter, r *http.Request) {
-	storageKey := chi.URLParam(r, "message_id")
+	rawKey := chi.URLParam(r, "message_id")
+	storageKey, _ := url.PathUnescape(rawKey)
 
 	var msg storedMessageLookup
 	if err := h.db.Where("storage_key = ?", storageKey).First(&msg).Error; err != nil {
