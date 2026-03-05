@@ -148,12 +148,12 @@ async function createRoute() {
       .split(",")
       .map((a) => a.trim())
       .filter((a) => a.length > 0);
-    await api.post<CreateRouteResponse>("/v3/routes", {
-      priority: newPriority.value,
-      description: newDescription.value,
-      expression: newExpression.value,
-      action: actionList,
-    });
+    const form = new URLSearchParams();
+    form.append("priority", String(newPriority.value));
+    form.append("expression", newExpression.value);
+    if (newDescription.value) form.append("description", newDescription.value);
+    for (const a of actionList) form.append("action", a);
+    await api.postFormMulti<CreateRouteResponse>("/v3/routes", form);
     // Reset form
     newPriority.value = 0;
     newExpression.value = "";

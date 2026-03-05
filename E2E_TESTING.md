@@ -89,14 +89,14 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Pagination for lists — verify pagination with many lists
 - [x] Pagination for members — verify pagination with many members
 
-### `routes.spec.ts`
-- [ ] Shows empty state — no routes displayed
-- [ ] Toggle create form — click "Add Route" to show form, click "Cancel" to hide
-- [ ] Create route via UI — fill priority, expression, actions, description, submit, verify appears
-- [ ] Routes table columns — priority, expression, actions, description, created at
-- [ ] View route detail — click expression, verify detail panel with ID, priority, description, expression, actions
-- [ ] Delete route — click delete, confirm, verify removed
-- [ ] Pagination — verify next/previous with many routes
+### `routes.spec.ts` ✅
+- [x] Shows empty state — no routes displayed
+- [x] Toggle create form — click "Add Route" to show form, click "Cancel" to hide
+- [x] Create route via UI — fill priority, expression, actions, description, submit, verify appears
+- [x] Routes table columns — priority, expression, actions, description, created at
+- [x] View route detail — click expression, verify detail panel with ID, priority, description, expression, actions
+- [x] Delete route — click delete, confirm, verify removed
+- [x] Pagination — verify next/previous with many routes
 
 ### `suppressions.spec.ts`
 - [ ] Domain selector required — table not shown until domain selected

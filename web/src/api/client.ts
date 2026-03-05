@@ -80,6 +80,14 @@ class ApiClient {
     });
   }
 
+  async postFormMulti<T>(url: string, data: URLSearchParams): Promise<T> {
+    return this.request<T>(url, {
+      method: "POST",
+      body: data.toString(),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+  }
+
   async del<T>(url: string): Promise<T> {
     return this.request<T>(url, { method: "DELETE" });
   }
