@@ -675,18 +675,18 @@ func TestListDeliveries_Empty(t *testing.T) {
 	var body map[string]interface{}
 	decodeJSON(t, rec, &body)
 
-	deliveriesRaw, ok := body["deliveries"]
+	itemsRaw, ok := body["items"]
 	if !ok {
-		t.Fatalf("expected 'deliveries' key in response, got: %v", body)
+		t.Fatalf("expected 'items' key in response, got: %v", body)
 	}
 
-	deliveries, ok := deliveriesRaw.([]interface{})
+	items, ok := itemsRaw.([]interface{})
 	if !ok {
-		t.Fatalf("expected 'deliveries' to be an array, got %T: %v", deliveriesRaw, deliveriesRaw)
+		t.Fatalf("expected 'items' to be an array, got %T: %v", itemsRaw, itemsRaw)
 	}
 
-	if len(deliveries) != 0 {
-		t.Errorf("expected empty deliveries array, got %d items: %v", len(deliveries), deliveries)
+	if len(items) != 0 {
+		t.Errorf("expected empty items array, got %d items: %v", len(items), items)
 	}
 }
 
@@ -746,24 +746,24 @@ func TestTriggerWebhook(t *testing.T) {
 	var deliveriesBody map[string]interface{}
 	decodeJSON(t, deliveriesRec, &deliveriesBody)
 
-	deliveries, ok := deliveriesBody["deliveries"].([]interface{})
+	items, ok := deliveriesBody["items"].([]interface{})
 	if !ok {
-		t.Fatalf("expected 'deliveries' array in response, got %T: %v",
-			deliveriesBody["deliveries"], deliveriesBody["deliveries"])
+		t.Fatalf("expected 'items' array in response, got %T: %v",
+			deliveriesBody["items"], deliveriesBody["items"])
 	}
 
-	if len(deliveries) == 0 {
+	if len(items) == 0 {
 		t.Fatal("expected at least one delivery attempt after trigger, got none")
 	}
 
 	// Verify the delivery entry has expected fields.
-	delivery, ok := deliveries[0].(map[string]interface{})
+	delivery, ok := items[0].(map[string]interface{})
 	if !ok {
-		t.Fatalf("expected delivery object, got %T", deliveries[0])
+		t.Fatalf("expected delivery object, got %T", items[0])
 	}
 
-	if webhookURL, _ := delivery["webhook_url"].(string); webhookURL != "https://example.com/webhook-receiver" {
-		t.Errorf("expected webhook_url %q, got %q", "https://example.com/webhook-receiver", webhookURL)
+	if webhookURL, _ := delivery["url"].(string); webhookURL != "https://example.com/webhook-receiver" {
+		t.Errorf("expected url %q, got %q", "https://example.com/webhook-receiver", webhookURL)
 	}
 
 	if eventType, _ := delivery["event_type"].(string); eventType != "delivered" {

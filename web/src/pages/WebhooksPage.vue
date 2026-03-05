@@ -87,12 +87,12 @@ const creating = ref(false);
 const webhookEventTypes = [
   "accepted",
   "delivered",
-  "failed",
   "opened",
   "clicked",
   "unsubscribed",
   "complained",
-  "stored",
+  "temporary_fail",
+  "permanent_fail",
 ];
 
 const webhookColumns: Column[] = [
@@ -102,11 +102,13 @@ const webhookColumns: Column[] = [
 ];
 
 const webhookRows = computed(() =>
-  Object.entries(webhooks.value).map(([eventType, entry]) => ({
-    event_type: eventType,
-    urls: (entry.urls || []).join(", "),
-    _event_type: eventType,
-  }))
+  Object.entries(webhooks.value)
+    .filter(([, entry]) => entry != null && Array.isArray(entry.urls) && entry.urls.length > 0)
+    .map(([eventType, entry]) => ({
+      event_type: eventType,
+      urls: entry.urls.join(", "),
+      _event_type: eventType,
+    }))
 );
 
 // --- Delivery log state ---
@@ -192,12 +194,12 @@ async function createWebhook() {
   creating.value = true;
   error.value = null;
   try {
-    await api.post<WebhookMutationResponse>(
+    const form = new URLSearchParams();
+    form.append("id", newWebhookEventType.value);
+    form.append("url", newWebhookUrl.value.trim());
+    await api.postFormMulti<WebhookMutationResponse>(
       `/v3/domains/${encodeURIComponent(selectedDomain.value)}/webhooks`,
-      {
-        id: newWebhookEventType.value,
-        url: [newWebhookUrl.value.trim()],
-      }
+      form
     );
     newWebhookUrl.value = "";
     await fetchWebhooks();

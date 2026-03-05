@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -610,8 +611,26 @@ func (h *Handlers) BulkDeleteAccountWebhooks(w http.ResponseWriter, r *http.Requ
 
 // ListDeliveries handles GET /mock/webhooks/deliveries
 func (h *Handlers) ListDeliveries(w http.ResponseWriter, r *http.Request) {
+	// Count total records
+	var totalCount int64
+	h.db.Model(&WebhookDelivery{}).Count(&totalCount)
+
+	// Parse pagination parameters
+	pageSize := 20
+	offset := 0
+	if ps := r.URL.Query().Get("limit"); ps != "" {
+		if n, err := strconv.Atoi(ps); err == nil && n > 0 && n <= 100 {
+			pageSize = n
+		}
+	}
+	if off := r.URL.Query().Get("offset"); off != "" {
+		if n, err := strconv.Atoi(off); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+
 	var deliveries []WebhookDelivery
-	h.db.Order("created_at DESC").Find(&deliveries)
+	h.db.Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&deliveries)
 
 	result := make([]map[string]interface{}, 0, len(deliveries))
 	for _, d := range deliveries {
@@ -620,22 +639,51 @@ func (h *Handlers) ListDeliveries(w http.ResponseWriter, r *http.Request) {
 			json.Unmarshal([]byte(d.Payload), &payload)
 		}
 
+		// Build request/response objects from the payload
+		requestObj := map[string]interface{}{
+			"headers": map[string]interface{}{"Content-Type": "application/json"},
+			"body":    payload,
+		}
+		responseObj := map[string]interface{}{
+			"status_code": d.StatusCode,
+			"headers":     map[string]interface{}{},
+			"body":        "",
+		}
+
 		result = append(result, map[string]interface{}{
 			"id":               d.ID,
-			"webhook_url":      d.WebhookURL,
+			"webhook_id":       d.EventID,
+			"url":              d.WebhookURL,
 			"event_type":       d.EventType,
-			"event_id":         d.EventID,
 			"domain":           d.DomainName,
-			"status_code":      d.StatusCode,
+			"message_id":       d.EventID,
+			"timestamp":        d.CreatedAt.Unix(),
+			"request":          requestObj,
+			"response":         responseObj,
 			"response_time_ms": d.ResponseTimeMs,
 			"attempt":          d.Attempt,
-			"timestamp":        d.CreatedAt.Format(time.RFC3339),
-			"payload":          payload,
+			"success":          d.StatusCode >= 200 && d.StatusCode < 300,
 		})
 	}
 
+	// Build paging URLs
+	paging := map[string]interface{}{}
+	baseURL := fmt.Sprintf("/mock/webhooks/deliveries?limit=%d", pageSize)
+	if offset+pageSize < int(totalCount) {
+		paging["next"] = fmt.Sprintf("%s&offset=%d", baseURL, offset+pageSize)
+	}
+	if offset > 0 {
+		prevOffset := offset - pageSize
+		if prevOffset < 0 {
+			prevOffset = 0
+		}
+		paging["previous"] = fmt.Sprintf("%s&offset=%d", baseURL, prevOffset)
+	}
+
 	response.RespondJSON(w, http.StatusOK, map[string]interface{}{
-		"deliveries": result,
+		"items":       result,
+		"paging":      paging,
+		"total_count": totalCount,
 	})
 }
 
@@ -735,8 +783,8 @@ func (h *Handlers) TriggerWebhook(w http.ResponseWriter, r *http.Request) {
 			EventType:      body.EventType,
 			EventID:        eventID,
 			DomainName:     body.Domain,
-			StatusCode:     0,
-			ResponseTimeMs: 0,
+			StatusCode:     200,
+			ResponseTimeMs: 1,
 			Attempt:        1,
 			Payload:        string(payloadJSON),
 		}

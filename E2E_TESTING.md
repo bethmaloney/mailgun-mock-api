@@ -118,16 +118,16 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Pagination — verify pagination across tabs
 - [x] Clear all per tab — verify clear all only clears active tab's data
 
-### `webhooks.spec.ts`
-- [ ] Shows empty state — no webhooks configured, no delivery log
-- [ ] Domain selector populated — verify domains in dropdown
-- [ ] Create webhook — select event type, enter URL, submit, verify appears in table
-- [ ] Webhook table shows event type badge and URLs
-- [ ] Delete webhook — click delete, verify removed
-- [ ] Delivery log shows entries — create webhook, send message, verify log entry
-- [ ] Expand delivery detail — click timestamp, verify request/response JSON
-- [ ] Collapse delivery detail — click again to collapse
-- [ ] Delivery log pagination — verify pagination with many deliveries
+### `webhooks.spec.ts` ✅
+- [x] Shows empty state — no webhooks configured, no delivery log
+- [x] Domain selector populated — verify domains in dropdown
+- [x] Create webhook — select event type, enter URL, submit, verify appears in table
+- [x] Webhook table shows event type badge and URLs
+- [x] Delete webhook — click delete, verify removed
+- [x] Delivery log shows entries — create webhook, send message, verify log entry
+- [x] Expand delivery detail — click timestamp, verify request/response JSON
+- [x] Collapse delivery detail — click again to collapse
+- [x] Delivery log pagination — verify pagination with many deliveries
 
 ### `settings.spec.ts`
 - [ ] Loads current configuration — all settings sections display current values
