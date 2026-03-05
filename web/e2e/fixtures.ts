@@ -306,6 +306,56 @@ export class ApiHelper {
     return res.json();
   }
 
+  /** Add a bounce suppression entry. */
+  async addBounce(
+    domain: string,
+    address: string,
+    code?: string,
+    error?: string,
+  ): Promise<Record<string, unknown>> {
+    const fields: Record<string, string> = { address };
+    if (code) fields.code = code;
+    if (error) fields.error = error;
+    const res = await this.formRequest("POST", `/v3/${domain}/bounces`, fields);
+    if (!res.ok) throw new Error(`addBounce failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  /** Add a complaint suppression entry. */
+  async addComplaint(
+    domain: string,
+    address: string,
+  ): Promise<Record<string, unknown>> {
+    const res = await this.formRequest("POST", `/v3/${domain}/complaints`, { address });
+    if (!res.ok) throw new Error(`addComplaint failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  /** Add an unsubscribe suppression entry. */
+  async addUnsubscribe(
+    domain: string,
+    address: string,
+    tag?: string,
+  ): Promise<Record<string, unknown>> {
+    const fields: Record<string, string> = { address };
+    if (tag) fields.tag = tag;
+    const res = await this.formRequest("POST", `/v3/${domain}/unsubscribes`, fields);
+    if (!res.ok) throw new Error(`addUnsubscribe failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  /** Add an allowlist entry (address or domain). */
+  async addAllowlistEntry(
+    domain: string,
+    value: string,
+    type: "address" | "domain",
+  ): Promise<Record<string, unknown>> {
+    const fields: Record<string, string> = type === "domain" ? { domain: value } : { address: value };
+    const res = await this.formRequest("POST", `/v3/${domain}/whitelists`, fields);
+    if (!res.ok) throw new Error(`addAllowlistEntry failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
   /** Create a template version via the Mailgun API. */
   async createTemplateVersion(
     domain: string,

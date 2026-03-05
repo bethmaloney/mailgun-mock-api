@@ -368,7 +368,7 @@ async function addBounce() {
   if (!addBounceAddress.value || !selectedDomain.value) return;
   error.value = null;
   try {
-    await api.post(
+    await api.postForm(
       `/v3/${encodeURIComponent(selectedDomain.value)}/bounces`,
       {
         address: addBounceAddress.value,
@@ -391,7 +391,7 @@ async function addComplaint() {
   if (!addComplaintAddress.value || !selectedDomain.value) return;
   error.value = null;
   try {
-    await api.post(
+    await api.postForm(
       `/v3/${encodeURIComponent(selectedDomain.value)}/complaints`,
       { address: addComplaintAddress.value }
     );
@@ -408,11 +408,11 @@ async function addUnsubscribe() {
   if (!addUnsubAddress.value || !selectedDomain.value) return;
   error.value = null;
   try {
-    await api.post(
+    await api.postForm(
       `/v3/${encodeURIComponent(selectedDomain.value)}/unsubscribes`,
       {
         address: addUnsubAddress.value,
-        tags: [addUnsubTag.value || "*"],
+        tag: addUnsubTag.value || "*",
       }
     );
     addUnsubAddress.value = "";
@@ -429,11 +429,11 @@ async function addAllowlistEntry() {
   if (!addAllowlistValue.value || !selectedDomain.value) return;
   error.value = null;
   try {
-    const payload =
+    const payload: Record<string, string> =
       addAllowlistType.value === "domain"
         ? { domain: addAllowlistValue.value }
         : { address: addAllowlistValue.value };
-    await api.post(
+    await api.postForm(
       `/v3/${encodeURIComponent(selectedDomain.value)}/whitelists`,
       payload
     );

@@ -98,25 +98,25 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Delete route — click delete, confirm, verify removed
 - [x] Pagination — verify next/previous with many routes
 
-### `suppressions.spec.ts`
-- [ ] Domain selector required — table not shown until domain selected
-- [ ] Bounces tab — empty state
-- [ ] Bounces tab — add bounce — fill address, code, error message, submit, verify appears
-- [ ] Bounces tab — delete bounce — click delete, verify removed
-- [ ] Bounces tab — clear all — click clear all, confirm, verify all removed
-- [ ] Complaints tab — switch tab — click Complaints tab, verify active
-- [ ] Complaints tab — add complaint — fill address, submit, verify appears
-- [ ] Complaints tab — delete complaint — click delete, verify removed
-- [ ] Unsubscribes tab — switch tab
-- [ ] Unsubscribes tab — add unsubscribe — fill address and tag, submit, verify appears
-- [ ] Unsubscribes tab — delete unsubscribe — click delete, verify removed
-- [ ] Allowlist tab — switch tab
-- [ ] Allowlist tab — add by address — select type "address", fill value, submit, verify appears
-- [ ] Allowlist tab — add by domain — select type "domain", fill value, submit, verify appears
-- [ ] Allowlist tab — delete entry — click delete, verify removed
-- [ ] Search filter — add multiple entries, type in search, verify client-side filtering
-- [ ] Pagination — verify pagination across tabs
-- [ ] Clear all per tab — verify clear all only clears active tab's data
+### `suppressions.spec.ts` ✅
+- [x] Domain selector required — table not shown until domain selected
+- [x] Bounces tab — empty state
+- [x] Bounces tab — add bounce — fill address, code, error message, submit, verify appears
+- [x] Bounces tab — delete bounce — click delete, verify removed
+- [x] Bounces tab — clear all — click clear all, confirm, verify all removed
+- [x] Complaints tab — switch tab — click Complaints tab, verify active
+- [x] Complaints tab — add complaint — fill address, submit, verify appears
+- [x] Complaints tab — delete complaint — click delete, verify removed
+- [x] Unsubscribes tab — switch tab
+- [x] Unsubscribes tab — add unsubscribe — fill address and tag, submit, verify appears
+- [x] Unsubscribes tab — delete unsubscribe — click delete, verify removed
+- [x] Allowlist tab — switch tab
+- [x] Allowlist tab — add by address — select type "address", fill value, submit, verify appears
+- [x] Allowlist tab — add by domain — select type "domain", fill value, submit, verify appears
+- [x] Allowlist tab — delete entry — click delete, verify removed
+- [x] Search filter — add multiple entries, type in search, verify client-side filtering
+- [x] Pagination — verify pagination across tabs
+- [x] Clear all per tab — verify clear all only clears active tab's data
 
 ### `webhooks.spec.ts`
 - [ ] Shows empty state — no webhooks configured, no delivery log
