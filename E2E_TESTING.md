@@ -142,22 +142,22 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Reset Per Domain — select domain, click reset, confirm, verify success
 - [x] Cancel reset confirmation — click reset, cancel dialog, verify no reset occurred
 
-### `trigger-events.spec.ts`
-- [ ] 3-step workflow visibility — only domain selector visible initially
-- [ ] Domain selector loads domains
-- [ ] Message list loads after domain selected — select domain, verify messages table appears
-- [ ] Message search filter — type in search, verify messages filtered
-- [ ] Select message — click select button, verify step 3 with message summary
-- [ ] Event type buttons — verify all 6 buttons present (Deliver, Fail, Open, Click, Unsubscribe, Complain)
-- [ ] Trigger deliver event — click Deliver, Trigger, verify success
-- [ ] Trigger fail event — shows severity and error fields — click Fail, verify fields appear
-- [ ] Trigger fail event — fill severity + error, trigger, verify success
-- [ ] Trigger click event — shows URL field — click Click, verify URL input
-- [ ] Trigger click event — fill URL, trigger, verify success
-- [ ] Trigger open event — trigger, verify success
-- [ ] Trigger unsubscribe event — trigger, verify success
-- [ ] Trigger complain event — trigger, verify success
-- [ ] Error result displayed — trigger event that fails, verify error badge
+### `trigger-events.spec.ts` ✅
+- [x] 3-step workflow visibility — only domain selector visible initially
+- [x] Domain selector loads domains
+- [x] Message list loads after domain selected — select domain, verify messages table appears
+- [x] Message search filter — type in search, verify messages filtered
+- [x] Select message — click select button, verify step 3 with message summary
+- [x] Event type buttons — verify all 6 buttons present (Deliver, Fail, Open, Click, Unsubscribe, Complain)
+- [x] Trigger deliver event — click Deliver, Trigger, verify success
+- [x] Trigger fail event — shows severity and error fields — click Fail, verify fields appear
+- [x] Trigger fail event — fill severity + error, trigger, verify success
+- [x] Trigger click event — shows URL field — click Click, verify URL input
+- [x] Trigger click event — fill URL, trigger, verify success
+- [x] Trigger open event — trigger, verify success
+- [x] Trigger unsubscribe event — trigger, verify success
+- [x] Trigger complain event — trigger, verify success
+- [x] Error result displayed — trigger event that fails, verify error badge
 
 ### `simulate-inbound.spec.ts`
 - [ ] Form shows required fields — from, to, subject visible, submit button disabled

@@ -236,9 +236,8 @@ async function triggerEvent() {
   triggerResult.value = null;
   try {
     const body = buildRequestBody();
-    const encodedId = encodeURIComponent(msg.storage_key);
     const resp = await api.post<TriggerResponse>(
-      `/mock/events/${encodeURIComponent(selectedDomain.value)}/${selectedEventType.value}/${encodedId}`,
+      `/mock/events/${selectedDomain.value}/${selectedEventType.value}/${msg.storage_key}`,
       body
     );
     triggerResult.value = {
