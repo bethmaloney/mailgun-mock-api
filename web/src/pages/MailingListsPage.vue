@@ -167,12 +167,13 @@ async function createList() {
   if (!newListAddress.value) return;
   error.value = null;
   try {
-    await api.post("/v3/lists", {
+    const fields: Record<string, string> = {
       address: newListAddress.value,
-      name: newListName.value,
-      description: newListDescription.value,
       access_level: "readonly",
-    });
+    };
+    if (newListName.value) fields.name = newListName.value;
+    if (newListDescription.value) fields.description = newListDescription.value;
+    await api.postForm("/v3/lists", fields);
     newListAddress.value = "";
     newListName.value = "";
     newListDescription.value = "";
@@ -253,13 +254,14 @@ async function addMember() {
   if (!selectedList.value || !newMemberAddress.value) return;
   error.value = null;
   try {
-    await api.post(
+    const fields: Record<string, string> = {
+      address: newMemberAddress.value,
+      subscribed: "true",
+    };
+    if (newMemberName.value) fields.name = newMemberName.value;
+    await api.postForm(
       `/v3/lists/${encodeURIComponent(selectedList.value.address)}/members`,
-      {
-        address: newMemberAddress.value,
-        name: newMemberName.value,
-        subscribed: true,
-      }
+      fields,
     );
     newMemberAddress.value = "";
     newMemberName.value = "";

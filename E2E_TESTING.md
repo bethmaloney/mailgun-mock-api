@@ -76,18 +76,18 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] Pagination for templates — verify pagination with many templates
 - [x] Pagination for versions — verify pagination with many versions
 
-### `mailing-lists.spec.ts`
-- [ ] Shows empty state — no mailing lists displayed
-- [ ] Create mailing list — fill address, name, description, submit, verify appears in table
-- [ ] Create list with only address — name and description optional
-- [ ] Lists show correct columns — address, name, members count, access level, created at
-- [ ] View list detail — click address, verify detail panel with all fields
-- [ ] Add member to list — fill email + name, add, verify member appears in members table
-- [ ] Member shows subscribed status — verify subscribed column shows yes/no
-- [ ] Remove member from list — click delete on member, verify removed
-- [ ] Delete mailing list — click delete on list, confirm, verify removed
-- [ ] Pagination for lists — verify pagination with many lists
-- [ ] Pagination for members — verify pagination with many members
+### `mailing-lists.spec.ts` ✅
+- [x] Shows empty state — no mailing lists displayed
+- [x] Create mailing list — fill address, name, description, submit, verify appears in table
+- [x] Create list with only address — name and description optional
+- [x] Lists show correct columns — address, name, members count, access level, created at
+- [x] View list detail — click address, verify detail panel with all fields
+- [x] Add member to list — fill email + name, add, verify member appears in members table
+- [x] Member shows subscribed status — verify subscribed column shows yes/no
+- [x] Remove member from list — click delete on member, verify removed
+- [x] Delete mailing list — click delete on list, confirm, verify removed
+- [x] Pagination for lists — verify pagination with many lists
+- [x] Pagination for members — verify pagination with many members
 
 ### `routes.spec.ts`
 - [ ] Shows empty state — no routes displayed

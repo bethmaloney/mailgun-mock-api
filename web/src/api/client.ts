@@ -13,13 +13,15 @@ class ApiClient {
   private async request<T>(url: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
       Accept: "application/json",
-      ...(options.headers as Record<string, string>),
     };
 
     // Only set Content-Type for requests with a body
     if (options.body) {
       headers["Content-Type"] = "application/json";
     }
+
+    // Spread options.headers AFTER defaults so callers can override Content-Type
+    Object.assign(headers, options.headers as Record<string, string>);
 
     const response = await fetch(url, {
       ...options,
@@ -63,6 +65,18 @@ class ApiClient {
     return this.request<T>(url, {
       method: "PUT",
       body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  async postForm<T>(url: string, data: Record<string, string>): Promise<T> {
+    const form = new URLSearchParams();
+    for (const [k, v] of Object.entries(data)) {
+      form.append(k, v);
+    }
+    return this.request<T>(url, {
+      method: "POST",
+      body: form.toString(),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
   }
 

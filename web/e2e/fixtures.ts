@@ -142,11 +142,30 @@ export class ApiHelper {
   async createMailingList(
     address: string,
     name?: string,
+    description?: string,
   ): Promise<Record<string, unknown>> {
     const fields: Record<string, string> = { address };
     if (name) fields.name = name;
+    if (description) fields.description = description;
     const res = await this.formRequest("POST", "/v3/lists", fields);
     if (!res.ok) throw new Error(`createMailingList failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  /** Add a member to a mailing list. */
+  async addMemberToList(
+    listAddress: string,
+    memberAddress: string,
+    name?: string,
+  ): Promise<Record<string, unknown>> {
+    const fields: Record<string, string> = { address: memberAddress, subscribed: "true" };
+    if (name) fields.name = name;
+    const res = await this.formRequest(
+      "POST",
+      `/v3/lists/${encodeURIComponent(listAddress)}/members`,
+      fields,
+    );
+    if (!res.ok) throw new Error(`addMemberToList failed: ${res.status} ${await res.text()}`);
     return res.json();
   }
 
