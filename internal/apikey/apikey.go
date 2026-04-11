@@ -41,7 +41,7 @@ type keyResponseDTO struct {
 	Role           string  `json:"role"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
-	ExpiresAt      string  `json:"expires_at"`
+	ExpiresAt      string  `json:"expires_at,omitempty"`
 	IsDisabled     bool   `json:"is_disabled"`
 	DisabledReason string `json:"disabled_reason"`
 	DomainName     string `json:"domain_name"`
@@ -63,9 +63,10 @@ func derefString(s *string) string {
 	return ""
 }
 
-// iso8601Format is the timestamp format expected by the Mailgun SDK's ISO8601Time type.
-// It does NOT include a timezone indicator (no "Z" suffix).
-const iso8601Format = "2006-01-02T15:04:05"
+// ISO8601Format is the timestamp format expected by the Mailgun SDK's ISO8601Time type.
+// It does NOT include a timezone indicator (no "Z" suffix). See
+// github.com/mailgun/mailgun-go/v5/mtypes/iso8601.go.
+const ISO8601Format = "2006-01-02T15:04:05"
 
 // toResponseDTO converts an APIKey model to a keyResponseDTO.
 func toResponseDTO(key APIKey) keyResponseDTO {
@@ -74,8 +75,8 @@ func toResponseDTO(key APIKey) keyResponseDTO {
 		Description:    key.Description,
 		Kind:           key.Kind,
 		Role:           key.Role,
-		CreatedAt:      key.CreatedAt.UTC().Format(iso8601Format),
-		UpdatedAt:      key.UpdatedAt.UTC().Format(iso8601Format),
+		CreatedAt:      key.CreatedAt.UTC().Format(ISO8601Format),
+		UpdatedAt:      key.UpdatedAt.UTC().Format(ISO8601Format),
 		IsDisabled:     key.IsDisabled,
 		DisabledReason: derefString(key.DisabledReason),
 		DomainName:     derefString(key.DomainName),
@@ -83,7 +84,7 @@ func toResponseDTO(key APIKey) keyResponseDTO {
 		UserName:       derefString(key.UserName),
 	}
 	if key.ExpiresAt != nil {
-		dto.ExpiresAt = key.ExpiresAt.UTC().Format(iso8601Format)
+		dto.ExpiresAt = key.ExpiresAt.UTC().Format(ISO8601Format)
 	}
 	return dto
 }

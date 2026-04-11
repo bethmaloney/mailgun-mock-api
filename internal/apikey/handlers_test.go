@@ -247,13 +247,13 @@ func TestCreateKey_HappyPath(t *testing.T) {
 		}
 	})
 
-	t.Run("created_at is ISO 8601 UTC format", func(t *testing.T) {
+	t.Run("created_at is ISO 8601 format (no timezone)", func(t *testing.T) {
 		if resp.Key.CreatedAt == "" {
 			t.Skip("created_at is empty, skipping format check")
 		}
-		_, err := time.Parse(time.RFC3339, resp.Key.CreatedAt)
+		_, err := time.Parse(apikey.ISO8601Format, resp.Key.CreatedAt)
 		if err != nil {
-			t.Errorf("expected created_at in ISO 8601 (RFC3339) format, got %q: %v", resp.Key.CreatedAt, err)
+			t.Errorf("expected created_at in ISO 8601 format (%s), got %q: %v", apikey.ISO8601Format, resp.Key.CreatedAt, err)
 		}
 	})
 }
@@ -536,7 +536,7 @@ func TestCreateKey_WithExpiration(t *testing.T) {
 		if resp.Key.ExpiresAt == nil {
 			t.Skip("expires_at is nil, skipping")
 		}
-		expiresAt, err := time.Parse(time.RFC3339, *resp.Key.ExpiresAt)
+		expiresAt, err := time.Parse(apikey.ISO8601Format, *resp.Key.ExpiresAt)
 		if err != nil {
 			t.Fatalf("failed to parse expires_at %q: %v", *resp.Key.ExpiresAt, err)
 		}
@@ -551,7 +551,7 @@ func TestCreateKey_WithExpiration(t *testing.T) {
 		if resp.Key.ExpiresAt == nil {
 			t.Skip("expires_at is nil, skipping")
 		}
-		expiresAt, err := time.Parse(time.RFC3339, *resp.Key.ExpiresAt)
+		expiresAt, err := time.Parse(apikey.ISO8601Format, *resp.Key.ExpiresAt)
 		if err != nil {
 			t.Fatalf("failed to parse expires_at %q: %v", *resp.Key.ExpiresAt, err)
 		}
@@ -632,18 +632,18 @@ func TestListKeys_ReturnsAllWithCorrectFormat(t *testing.T) {
 		}
 	})
 
-	t.Run("timestamps are ISO 8601 UTC format", func(t *testing.T) {
+	t.Run("timestamps are ISO 8601 format (no timezone)", func(t *testing.T) {
 		for _, item := range resp.Items {
 			if item.CreatedAt != "" {
-				_, err := time.Parse(time.RFC3339, item.CreatedAt)
+				_, err := time.Parse(apikey.ISO8601Format, item.CreatedAt)
 				if err != nil {
-					t.Errorf("expected created_at in ISO 8601 (RFC3339) format, got %q: %v", item.CreatedAt, err)
+					t.Errorf("expected created_at in ISO 8601 format (%s), got %q: %v", apikey.ISO8601Format, item.CreatedAt, err)
 				}
 			}
 			if item.UpdatedAt != "" {
-				_, err := time.Parse(time.RFC3339, item.UpdatedAt)
+				_, err := time.Parse(apikey.ISO8601Format, item.UpdatedAt)
 				if err != nil {
-					t.Errorf("expected updated_at in ISO 8601 (RFC3339) format, got %q: %v", item.UpdatedAt, err)
+					t.Errorf("expected updated_at in ISO 8601 format (%s), got %q: %v", apikey.ISO8601Format, item.UpdatedAt, err)
 				}
 			}
 		}

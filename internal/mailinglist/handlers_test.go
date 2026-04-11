@@ -211,7 +211,7 @@ func createList(t *testing.T, router http.Handler, fields map[string]string) *ht
 func createListOK(t *testing.T, router http.Handler, fields map[string]string) {
 	t.Helper()
 	rec := createList(t, router, fields)
-	assertStatus(t, rec, http.StatusCreated)
+	assertStatus(t, rec, http.StatusOK)
 }
 
 // addMember adds a member to a mailing list via the API and returns the recorder.
@@ -241,7 +241,7 @@ func TestCreateList_Basic(t *testing.T) {
 	rec := createList(t, router, map[string]string{
 		"address": "developers@example.com",
 	})
-	assertStatus(t, rec, http.StatusCreated)
+	assertStatus(t, rec, http.StatusOK)
 
 	var resp listResponse
 	decodeJSON(t, rec, &resp)
@@ -281,7 +281,7 @@ func TestCreateList_AllFields(t *testing.T) {
 		"access_level":     "members",
 		"reply_preference": "sender",
 	})
-	assertStatus(t, rec, http.StatusCreated)
+	assertStatus(t, rec, http.StatusOK)
 
 	var resp listResponse
 	decodeJSON(t, rec, &resp)
@@ -513,7 +513,7 @@ func TestCreateList_ReadonlyForcesReplyPreferenceSender(t *testing.T) {
 		"access_level":     "readonly",
 		"reply_preference": "list",
 	})
-	assertStatus(t, rec, http.StatusCreated)
+	assertStatus(t, rec, http.StatusOK)
 
 	var resp listResponse
 	decodeJSON(t, rec, &resp)
@@ -1538,7 +1538,7 @@ func TestCreateList_AccessLevelEveryone(t *testing.T) {
 		"address":      "public@example.com",
 		"access_level": "everyone",
 	})
-	assertStatus(t, rec, http.StatusCreated)
+	assertStatus(t, rec, http.StatusOK)
 
 	var resp listResponse
 	decodeJSON(t, rec, &resp)
@@ -1559,7 +1559,7 @@ func TestCreateList_AccessLevelMembers(t *testing.T) {
 		"address":      "private@example.com",
 		"access_level": "members",
 	})
-	assertStatus(t, rec, http.StatusCreated)
+	assertStatus(t, rec, http.StatusOK)
 
 	var resp listResponse
 	decodeJSON(t, rec, &resp)
@@ -1802,7 +1802,7 @@ func TestCreateList_CreatedAtFormat(t *testing.T) {
 	rec := createList(t, router, map[string]string{
 		"address": "formatcheck@example.com",
 	})
-	assertStatus(t, rec, http.StatusCreated)
+	assertStatus(t, rec, http.StatusOK)
 
 	var resp listResponse
 	decodeJSON(t, rec, &resp)

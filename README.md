@@ -27,9 +27,19 @@ Point your Mailgun client at this service instead of `api.mailgun.net` and every
 
 See [`implementation_plan/overview.md`](implementation_plan/overview.md) for the full breakdown.
 
-## Status
+## Development
 
-**Early stage** — currently documenting the Mailgun API and planning the implementation. No runnable code yet.
+Commands are run via [`just`](https://github.com/casey/just). Run `just` with no args to list all recipes.
+
+### Testing
+
+| Task | Command |
+|---|---|
+| Go tests (unit + integration) | `just test` |
+| Integration tests only (with optional filter) | `just integration` / `just integration Credentials` |
+| Playwright frontend e2e tests | `just test-e2e` |
+
+`just test` runs everything under `./...`, which covers both unit tests in `internal/` and the integration suite in `tests/integration/`. `just test-e2e` builds the SPA, starts the server, and runs Playwright against it.
 
 ## License
 

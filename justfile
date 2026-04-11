@@ -26,7 +26,11 @@ lint:
     go vet ./...
     cd web && npm run lint
 
-# Run integration tests (optionally filter by section name, e.g. just integration Credentials)
+# Run Go tests (unit + integration)
+test:
+    go test ./...
+
+# Run integration tests only, optionally filter by section name (e.g. just integration Credentials)
 integration section="":
     @if [ -z "{{section}}" ]; then \
         go test ./tests/integration/ -v; \
@@ -35,7 +39,7 @@ integration section="":
     fi
 
 # Run Playwright e2e tests (builds first, starts server automatically)
-e2e:
+test-e2e:
     cd web && npm run test:e2e
 
 # Remove build artifacts

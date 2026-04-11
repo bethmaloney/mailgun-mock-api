@@ -120,7 +120,7 @@ func createTestList(t *testing.T, router http.Handler, address string) {
 	req := newMultipartRequest(t, http.MethodPost, "/v3/lists", map[string]string{"address": address})
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
-	if rec.Code != http.StatusCreated {
+	if rec.Code != http.StatusOK {
 		t.Fatalf("failed to create test list %q: status=%d body=%s", address, rec.Code, rec.Body.String())
 	}
 }

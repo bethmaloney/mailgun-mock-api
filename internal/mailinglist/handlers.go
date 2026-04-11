@@ -203,6 +203,8 @@ func (h *Handlers) CreateList(w http.ResponseWriter, r *http.Request) {
 	for k, v := range listItem {
 		resp[k] = v
 	}
+	// Note: spec says 201, but the official mailgun-go SDK only accepts
+	// 200/202/204 for this endpoint. Returning 200 to preserve SDK compatibility.
 	response.RespondJSON(w, http.StatusOK, resp)
 }
 
