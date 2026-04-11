@@ -41,7 +41,7 @@ The mock keeps its current single-process shape (Go binary serving the Mailgun-c
   — Basic api:<key> ───────────► │  │   Basic?  → api_keys   │  │
                                  │  └──────────┬─────────────┘  │
                                  │             ▼                │
-                                 │  api_keys table (plaintext)  │
+                                 │  managed_api_keys (plaintext)│
                                  │  existing Mailgun handlers   │
                                  └──────────────────────────────┘
 ```
@@ -49,10 +49,12 @@ The mock keeps its current single-process shape (Go binary serving the Mailgun-c
 ### Key principles
 
 1. **Two surfaces, but the auth mechanisms overlap** on the Mailgun-compat surface via dual-auth. The Vue SPA calls `/v3/*` and `/v4/*` extensively (domain picker, routes CRUD, templates, suppressions, etc.), so an Entra-only-on-`/mock/*` split is not enough. The Mailgun-compat middleware accepts **either** a valid Entra JWT (browser) **or** a valid managed API key (SDK clients).
-2. **Both layers are opt-in** via `AUTH_MODE`. Local dev runs with `AUTH_MODE=disabled` and nothing changes for contributors. Deployed instances flip it on.
-3. **Single source of truth: backend env vars.** The Vue bundle is config-free at build time and fetches its Entra settings from `/mock/auth-config` at startup. One binary, many deployments.
-4. **Bootstrap order resolves itself.** Entra-authenticated UI users access the UI freely → mint API keys from the UI → distribute those keys to test apps. No chicken-and-egg.
-5. **No new external services.** `github.com/coreos/go-oidc/v3` on the backend, `@azure/msal-browser` in the SPA, Microsoft's public JWKS/OIDC discovery endpoints.
+2. **One switch, not two.** `AUTH_MODE=entra` is the *single* master switch for a locked-down deployment. When it's on, the Basic-auth path on the Mailgun-compat surface is structurally forced to validate against the managed-keys table — `mock.MockConfig.Authentication.AuthMode` is ignored on that path. This is deliberate: an operator who enables Entra should not have to also remember to flip a second, unrelated toggle in the runtime mock config to actually protect `/v3/*`. The old `full` / `single` / `accept_any` modes in mock config remain the governing behavior in `disabled` mode only.
+3. **Both layers are opt-in** via `AUTH_MODE`. Local dev runs with `AUTH_MODE=disabled` and nothing changes for contributors. Deployed instances flip it on.
+4. **Single source of truth: backend env vars.** The Vue bundle is config-free at build time and fetches its Entra settings from `/mock/auth-config` at startup. One binary, many deployments.
+5. **Bootstrap order resolves itself.** Entra-authenticated UI users access the UI freely → mint API keys from the UI → distribute those keys to test apps. No chicken-and-egg.
+6. **Same-origin by construction.** The Go binary embeds the Vue SPA via `//go:embed` and serves it from the same process as the API (`internal/server/server.go:32-34, 445`). Browsers load `https://mock.example.com/` and fetch `/v4/domains` from the *same* origin and port. `just dev-ui` uses a Vite server-side proxy (`web/vite.config.ts:18-26`) so even during frontend HMR the browser never crosses an origin. The Mailgun SDK calls the mock from server-side test code, not from a browser, so browser CORS is not in the threat model. **Therefore we do not need CORS middleware at all** — the existing `cors.Handler` block in `server.go:40-46` is dead weight (and has a latent spec bug: `AllowedOrigins: ["*"]` with `AllowCredentials: true` is rejected by browsers). This plan removes it; see Task 11.
+7. **No new external services.** `github.com/coreos/go-oidc/v3` on the backend, `@azure/msal-browser` in the SPA, Microsoft's public JWKS/OIDC discovery endpoints.
 
 ## What the Vue app calls (and why dual-auth is required)
 
@@ -93,9 +95,15 @@ Backend env vars (read by `internal/config/config.go`):
 
 In `disabled` mode, all `ENTRA_*` vars are ignored and everything behaves as it does today. In `entra` mode, any missing `ENTRA_*` var causes the server to fail fast at startup.
 
-**Bootstrap endpoint:** unauthenticated `GET /mock/auth-config` returns the public subset for the SPA:
+**Bootstrap endpoint:** unauthenticated `GET /mock/auth-config` returns one of two shapes:
 
 ```json
+// Disabled mode
+{ "enabled": false }
+```
+
+```json
+// Entra mode — all fields required when enabled: true
 {
   "enabled": true,
   "tenantId": "...",
@@ -105,7 +113,7 @@ In `disabled` mode, all `ENTRA_*` vars are ignored and everything behaves as it 
 }
 ```
 
-When `enabled: false`, the SPA skips MSAL initialization entirely and mounts as it does today.
+The SPA models this as a TypeScript discriminated union (`{enabled: false} | {enabled: true; tenantId: string; ...}`) so the type checker enforces "if enabled, the config fields are guaranteed present" at compile time — no optional-field undefined derefs in `initMsal`. See Task 12. When `enabled: false`, the SPA skips MSAL initialization entirely and mounts as it does today.
 
 ## Backend changes (Go)
 
@@ -118,7 +126,11 @@ package auth
 
 import (
     "context"
+    "errors"
     "fmt"
+    "net"
+    "net/url"
+    "strings"
     "github.com/coreos/go-oidc/v3/oidc"
 )
 
@@ -126,41 +138,80 @@ type Claims struct {
     OID   string `json:"oid"`
     Email string `json:"preferred_username"`
     Name  string `json:"name"`
+    Scope string `json:"scp"` // space-delimited list of granted scopes
 }
+
+// ErrProviderUnavailable signals that token validation could not complete
+// because the identity provider (JWKS / discovery) was unreachable. Callers
+// should surface this as 503, not 401 — the problem is "our side," not the
+// caller's credentials. See H6 in the review.
+var ErrProviderUnavailable = errors.New("auth: identity provider unavailable")
 
 type Validator struct {
-    verifier *oidc.IDTokenVerifier
+    verifier      *oidc.IDTokenVerifier
+    requiredScope string
 }
 
-func NewValidator(ctx context.Context, tenantID, expectedAud string) (*Validator, error) {
+func NewValidator(ctx context.Context, tenantID, expectedAud, requiredScope string) (*Validator, error) {
     issuer := fmt.Sprintf("https://login.microsoftonline.com/%s/v2.0", tenantID)
     provider, err := oidc.NewProvider(ctx, issuer)
     if err != nil {
         return nil, err
     }
     return &Validator{
-        verifier: provider.Verifier(&oidc.Config{ClientID: expectedAud}),
+        verifier:      provider.Verifier(&oidc.Config{ClientID: expectedAud}),
+        requiredScope: requiredScope,
     }, nil
 }
 
 func (v *Validator) Validate(ctx context.Context, raw string) (*Claims, error) {
     tok, err := v.verifier.Verify(ctx, raw)
     if err != nil {
+        // Distinguish "can't reach JWKS" (our problem, 503) from "token is bad"
+        // (caller's problem, 401). go-oidc surfaces JWKS fetch failures as
+        // *url.Error / net.Error types; everything else (wrong sig, wrong
+        // issuer, expired, malformed) is a token-content problem.
+        var urlErr *url.Error
+        var netErr net.Error
+        if errors.As(err, &urlErr) || errors.As(err, &netErr) {
+            return nil, fmt.Errorf("%w: %v", ErrProviderUnavailable, err)
+        }
         return nil, err
     }
     var c Claims
     if err := tok.Claims(&c); err != nil {
         return nil, err
     }
+    // Signature/issuer/audience are verified above. We additionally require
+    // that the token carries the scope this app exposes — otherwise any token
+    // minted against api://<client-id> (including for a different scope, or
+    // an on-behalf-of exchange) would be accepted.
+    if v.requiredScope != "" {
+        granted := strings.Fields(c.Scope)
+        found := false
+        for _, s := range granted {
+            if s == v.requiredScope {
+                found = true
+                break
+            }
+        }
+        if !found {
+            return nil, fmt.Errorf("token missing required scope %q", v.requiredScope)
+        }
+    }
     return &c, nil
 }
 ```
 
-`expectedAud` is `"api://" + clientID`, not the bare client ID — Azure access tokens have `aud = api://<client-id>`.
+Callers in `internal/middleware/middleware.go` check for `ErrProviderUnavailable` with `errors.Is(err, auth.ErrProviderUnavailable)` and return 503 with `WWW-Authenticate: Bearer error="temporarily_unavailable"`. All other validation errors return 401.
 
-### Entra-specific gotcha: token version
+`expectedAud` is `"api://" + clientID`, not the bare client ID — Azure access tokens have `aud = api://<client-id>`. `requiredScope` is the bare scope name (e.g. `access_as_user`), matched against the `scp` claim — not the fully-qualified `api://<client-id>/access_as_user` form, which is only used client-side when requesting the token.
 
-Azure AD issues two access token versions. The v1.0 token has `iss = https://sts.windows.net/<tenant>/`, the v2.0 token has `iss = https://login.microsoftonline.com/<tenant>/v2.0`. go-oidc's discovery returns the v2.0 issuer, so **the app registration manifest must set `accessTokenAcceptedVersion: 2`** or validation will fail with an issuer mismatch.
+### Entra-specific gotchas
+
+**Token version.** Azure AD issues two access token versions. The v1.0 token has `iss = https://sts.windows.net/<tenant>/`, the v2.0 token has `iss = https://login.microsoftonline.com/<tenant>/v2.0`. go-oidc's discovery returns the v2.0 issuer, so **the app registration manifest must set `accessTokenAcceptedVersion: 2`** or validation will fail with an issuer mismatch.
+
+**`scp` claim form.** The SPA requests the token via MSAL with a fully-qualified scope (`api://<client-id>/access_as_user`), but the `scp` claim in the resulting JWT only contains the bare scope name (`access_as_user`). `NewValidator` and `ENTRA_API_SCOPE` use the bare form; only `ENTRA_API_SCOPE` as consumed by the SPA-facing `/mock/auth-config` response is concatenated into the fully-qualified form.
 
 ### `internal/config/config.go` — new fields
 
@@ -181,34 +232,81 @@ Load from env vars with `disabled` default. Add a `Validate()` method that retur
 
 ### `internal/middleware/middleware.go` — three changes
 
-1. **Rename `BasicAuth` → `APIAuth`** and extend with a Bearer path:
+1. **Rename `BasicAuth` → `APIAuth`** and extend with a Bearer path AND an entra-mode override on the Basic path. All 401/503 responses carry an RFC 7235-compliant `WWW-Authenticate` header (H4), and JWKS fetch failures translate to 503 with a `temporarily_unavailable` error code (H6):
 
     ```go
-    func APIAuth(configPtr *mock.MockConfig, v *auth.Validator) func(http.Handler) http.Handler {
+    const (
+        wwwAuthBearer = `Bearer realm="mailgun-mock-api"`
+        wwwAuthBasic  = `Basic realm="mailgun-mock-api"`
+    )
+
+    func unauthorized(w http.ResponseWriter, challenge, msg string) {
+        w.Header().Set("WWW-Authenticate", challenge)
+        response.RespondError(w, http.StatusUnauthorized, msg)
+    }
+
+    func providerUnavailable(w http.ResponseWriter) {
+        w.Header().Set("WWW-Authenticate", `Bearer error="temporarily_unavailable"`)
+        response.RespondError(w, http.StatusServiceUnavailable, "Auth provider unavailable")
+    }
+
+    func APIAuth(configPtr *mock.MockConfig, db *gorm.DB, v *auth.Validator) func(http.Handler) http.Handler {
         return func(next http.Handler) http.Handler {
             return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
                 // Bearer path (dual-auth for the SPA)
                 if bearer := extractBearer(r); bearer != "" {
                     if v == nil {
-                        response.RespondError(w, http.StatusUnauthorized, "Forbidden")
+                        unauthorized(w, wwwAuthBasic, "Forbidden")
                         return
                     }
                     if _, err := v.Validate(r.Context(), bearer); err != nil {
-                        response.RespondError(w, http.StatusUnauthorized, "Invalid token")
+                        if errors.Is(err, auth.ErrProviderUnavailable) {
+                            providerUnavailable(w)
+                            return
+                        }
+                        unauthorized(w, wwwAuthBearer, "Invalid token")
                         return
                     }
                     next.ServeHTTP(w, r)
                     return
                 }
-                // Basic path (existing behavior, extended to support managed_keys mode)
-                // ... existing switch on configPtr.Authentication.AuthMode ...
-                // New case "managed_keys": DB lookup in api_keys table
+                // Basic path.
+                //
+                // IMPORTANT: when entra is enabled (v != nil), the Basic path
+                // is STRUCTURALLY forced to use managed-keys DB lookup,
+                // regardless of configPtr.Authentication.AuthMode. This is the
+                // anti-footgun: an operator who flips AUTH_MODE=entra must NOT
+                // have to also remember to flip mock config to managed_keys
+                // to actually lock down /v3/* — otherwise a stale "full" mock
+                // config (the default) would leave the Mailgun-compat surface
+                // open to any non-empty password.
+                if v != nil {
+                    username, password, ok := r.BasicAuth()
+                    if !ok || username != "api" || password == "" {
+                        unauthorized(w, wwwAuthBasic, "Forbidden")
+                        return
+                    }
+                    var key apikey.ManagedAPIKey
+                    if err := db.Where("key_value = ?", password).First(&key).Error; err != nil {
+                        unauthorized(w, wwwAuthBasic, "Forbidden")
+                        return
+                    }
+                    next.ServeHTTP(w, r)
+                    return
+                }
+                // Disabled mode: existing switch on configPtr.Authentication.AuthMode
+                // (full / single / accept_any, plus the new optional managed_keys
+                // case for local testing of the managed-keys lookup without enabling Entra).
+                // All 401 responses in the switch use unauthorized(w, wwwAuthBasic, ...).
+                // ... existing switch body, adapted ...
             })
         }
     }
     ```
 
-    A Bearer token that fails validation does **not** fall through to Basic Auth — that's a fail-fast to avoid ambiguous errors.
+    A Bearer token that fails validation does **not** fall through to Basic Auth — that's a fail-fast to avoid ambiguous errors. Similarly, in entra mode the Basic path does **not** consult `mock.MockConfig.Authentication.AuthMode` at all; the runtime config cannot weaken the deployment's auth posture.
+
+    `EntraRequired` (for `/mock/*`) uses the same `unauthorized` / `providerUnavailable` helpers, with `wwwAuthBearer` as the challenge.
 
 2. **New `EntraRequired` middleware** for `/mock/*` and `/mock/ws`:
 
@@ -225,11 +323,15 @@ Load from env vars with `disabled` default. Add a `Validate()` method that retur
                     token = r.URL.Query().Get("access_token") // WebSocket path
                 }
                 if token == "" {
-                    response.RespondError(w, http.StatusUnauthorized, "Unauthenticated")
+                    unauthorized(w, wwwAuthBearer, "Unauthenticated")
                     return
                 }
                 if _, err := v.Validate(r.Context(), token); err != nil {
-                    response.RespondError(w, http.StatusUnauthorized, "Invalid token")
+                    if errors.Is(err, auth.ErrProviderUnavailable) {
+                        providerUnavailable(w)
+                        return
+                    }
+                    unauthorized(w, wwwAuthBearer, "Invalid token")
                     return
                 }
                 next.ServeHTTP(w, r)
@@ -242,19 +344,18 @@ Load from env vars with `disabled` default. Add a `Validate()` method that retur
 
 ### `internal/apikey/` — extend
 
-Add `ManagedAPIKey` model (lives alongside the existing Mailgun-compat `APIKey`):
+Add `ManagedAPIKey` model (lives alongside the existing Mailgun-compat `APIKey`, in the same package but in a new file `managed.go`):
 
 ```go
 type ManagedAPIKey struct {
-    ID        uint   `gorm:"primaryKey"`
-    Name      string `gorm:"not null"`
-    KeyValue  string `gorm:"uniqueIndex;not null"`
-    Prefix    string `gorm:"not null"` // first 8 chars for display
-    CreatedAt time.Time
+    database.BaseModel          // string UUID ID + CreatedAt/UpdatedAt/DeletedAt
+    Name     string `gorm:"not null" json:"name"`
+    KeyValue string `gorm:"uniqueIndex;not null" json:"key_value"`
+    Prefix   string `gorm:"not null" json:"prefix"` // "mock_" + first 8 chars of the random suffix, for display in the UI list
 }
 ```
 
-Key format: `mock_<base64url(32 random bytes)>`, with a `UNIQUE` constraint and a single retry on collision. New file `managed_handlers.go` for UI-facing CRUD:
+`BaseModel` is the same string-UUID + soft-delete base used by every other model in the repo (`internal/database/database.go:15-28`), so listings and deletes stay consistent with the rest of the codebase. Key format: `mock_<base64url(32 random bytes)>`, with a `UNIQUE` constraint on `KeyValue`. New file `managed_handlers.go` for UI-facing CRUD:
 
 - `GET /mock/api-keys` — list, returns full plaintext values
 - `POST /mock/api-keys` — body `{name}`, server generates key, returns full value
@@ -262,17 +363,22 @@ Key format: `mock_<base64url(32 random bytes)>`, with a `UNIQUE` constraint and 
 
 The existing `/v1/keys` Mailgun-compat handlers stay untouched as a pure mock. Clearly separate from the real key store.
 
-**New auth mode:** `managed_keys` added to the existing `full` / `single` / `accept_any` enum in `mock.MockConfig.Authentication.AuthMode`. When active, Basic Auth validates the password against the `managed_api_keys` table.
+**`managed_keys` mock config mode.** A new `managed_keys` value is added to the existing `full` / `single` / `accept_any` enum in `mock.MockConfig.Authentication.AuthMode`. When active, the APIAuth middleware validates the Basic Auth password against the `managed_api_keys` table.
+
+This mode is **only consulted in `disabled` Entra mode** — it gives contributors a way to exercise the managed-keys lookup logic locally without needing a real Entra app registration, and lets the Task 6 unit tests run in isolation. In `entra` mode the Basic path unconditionally does managed-keys lookup, and `mock.MockConfig.Authentication.AuthMode` is ignored (see Key principle #2).
 
 ### `internal/server/server.go` — wiring
 
-- In `New(db)`: if `cfg.AuthMode == "entra"`, call `auth.NewValidator(ctx, cfg.EntraTenantID, "api://"+cfg.EntraClientID)`. Fail fast on error.
+- Signature change: `func New(ctx context.Context, db *gorm.DB, cfg *config.Config) http.Handler`.
+- In `New`: if `cfg.AuthMode == "entra"`, call `auth.NewValidator(ctx, cfg.EntraTenantID, "api://"+cfg.EntraClientID, cfg.EntraAPIScope)` (bare scope name — see the `scp` claim gotcha above). Fail fast on error. Otherwise `validator = nil`.
 - Add `&apikey.ManagedAPIKey{}` to the existing `db.AutoMigrate(...)` block.
-- Wrap all `/mock/*` route registrations with `EntraRequired(validator)` (nil validator == disabled, pass-through).
-- Replace `BasicAuth(h.Config())` with `APIAuth(h.Config(), validator)` in every route group that currently uses it.
-- Register the new unauthenticated `GET /mock/auth-config` route (not wrapped in `EntraRequired`, since the SPA needs it before signing in).
-- Register the new `GET|POST|DELETE /mock/api-keys` routes wrapped in `EntraRequired`.
-- Wrap `/mock/ws` with the log-scrubbing middleware + `EntraRequired`.
+- **Delete the existing `cors.Handler(...)` block and its import.** Same-origin architecture (Key principle #6); `go mod tidy` drops `github.com/go-chi/cors`.
+- Replace every `BasicAuth(h.Config())` call site (~30 of them) with `APIAuth(h.Config(), db, validator)`.
+- Wrap the `/mock/*` route group with `EntraRequired(validator)` via `r.Use(...)` at the top of `r.Route("/mock", ...)`. Nil validator is a pass-through (disabled mode).
+- **Move `/mock/health` and `/mock/auth-config` *out* of the `/mock` group** — register them at the root router *before* the group is defined, so they don't inherit `EntraRequired`. Otherwise health probes and the SPA's pre-login config fetch would be blocked.
+- Register `GET|POST|DELETE /mock/api-keys` routes inside the Entra-protected `/mock` group.
+- Wrap `/mock/ws` with the log-scrubbing middleware + `EntraRequired`, and when `validator != nil` arm a 30-minute `time.AfterFunc` after the handshake to bound the token-revocation window (H5; see Error handling).
+- See Task 11 for the full checklist and the end-to-end `server_entra_test.go` that proves this wiring works.
 
 ## Frontend changes (Vue)
 
@@ -283,7 +389,7 @@ The existing `/v1/keys` Mailgun-compat handlers stay untouched as a pure mock. C
 ### New files
 
 - **`web/src/auth/config.ts`** — `fetchAuthConfig(): Promise<AuthConfig>` helper that GETs `/mock/auth-config` once and returns the typed config.
-- **`web/src/auth/msalInstance.ts`** — singleton `PublicClientApplication` factory constructed from the fetched config with `cache: { cacheLocation: "localStorage" }` (persistent across tab closes). Exports `msalInstance`, `getActiveAccount()`, `getAccessToken()`, `signIn()`, `signOut()`. `getAccessToken()` wraps `acquireTokenSilent` with an `acquireTokenRedirect` fallback for `InteractionRequiredAuthError`.
+- **`web/src/auth/msalInstance.ts`** — singleton `PublicClientApplication` factory constructed from the fetched config with `cache: { cacheLocation: "localStorage" }` (persistent across tab closes). Exports `msalInstance`, `getActiveAccount()`, `getAccessToken()`, `signIn()`, `signOut()`. `getAccessToken()` wraps `acquireTokenSilent` with an `acquireTokenRedirect` fallback for `InteractionRequiredAuthError`. `signOut()` calls `msal.logoutRedirect({ postLogoutRedirectUri: window.location.origin, account: getActiveAccount() })` — this terminates the user's Entra session (not just the local MSAL cache) and returns them to the SPA root, where `main.ts`'s bootstrap will re-run and kick them back into `loginRedirect` if auth is still enabled. Local-cache-only sign-out is deliberately NOT offered — it would create a user who appears signed out but whose next `acquireTokenSilent` call silently re-authenticates from the tenant session, which is confusing and defeats the point of the button.
 - **`web/src/composables/useAuth.ts`** — reactive wrapper exposing `user`, `isAuthenticated`, `signIn`, `signOut` for components.
 - **`web/src/pages/ApiKeysPage.vue`** — list/create/delete against `/mock/api-keys`. Same visual structure as existing pages: table, "New Key" modal with a name field, "Created" modal showing the plaintext key with copy-to-clipboard, delete confirmation. Empty-state copy: "No API keys yet. Test apps won't be able to call the Mailgun API surface until you create one."
 
@@ -291,10 +397,13 @@ The existing `/v1/keys` Mailgun-compat handlers stay untouched as a pure mock. C
 
 - **`web/src/main.ts`** — becomes async. Flow:
   1. `const cfg = await fetchAuthConfig()`
-  2. If `!cfg.enabled`, mount immediately (current behavior).
-  3. Otherwise: init MSAL with `cfg`, call `handleRedirectPromise()` to consume any pending redirect, check for an active account, call `loginRedirect({scopes})` if none, mount once signed in.
+  2. If `!cfg.enabled`: `startWebSocket()`, then mount (current behavior + explicit WS start).
+  3. Otherwise: init MSAL with `cfg`, call `handleRedirectPromise()` to consume any pending redirect, check for an active account, call `loginRedirect({scopes})` if none, `startWebSocket()` once the active account is present, mount.
+  - The explicit `startWebSocket()` call is load-bearing: the composable no longer self-initializes on import (see note below), because doing so would fire before auth is ready.
 - **`web/src/api/client.ts`** — the `request<T>()` method gains a pre-flight step: if auth is enabled, call `getAccessToken()` and set `Authorization: Bearer <jwt>`. Applies uniformly to every URL — `/mock/*` and `/v3/*` alike. No per-page changes needed.
-- **`web/src/composables/useWebSocket.ts`** — if auth enabled, append `?access_token=<jwt>` to the WS URL before opening. On close with a 1008/4401 code, fetch a fresh token and reconnect.
+- **`web/src/composables/useWebSocket.ts`** — two changes:
+  1. **Remove the module-level `connect()` call** at the bottom of the file. Today `connect()` fires as a side effect of importing the module, which happens during `App.vue`'s import chain *before* `main.ts` has had a chance to `await` the auth bootstrap. With Entra enabled, that early connect would hit `/mock/ws` with no token and fail. Replace the eager call with an exported `startWebSocket()` function that `main.ts` invokes at the end of `bootstrap()`, once auth is ready (or immediately, in disabled mode).
+  2. Make `getWSUrl()` async: if auth is enabled, append `?access_token=<jwt>` to the WS URL before opening. The reconnection logic re-runs `getWSUrl()` each time, so token refresh on reconnect is automatic. On close with a 1008/4401 code, fetch a fresh token and reconnect.
 - **`web/src/App.vue`** — sidebar header gains a small user block (name + sign-out button) shown only when auth is enabled. New nav link "API Keys" under the Config section.
 - **`web/src/router/index.ts`** — register `/api-keys` route. Light navigation guard redirects to `signIn()` if auth is enabled and no active account (belt-and-braces; `main.ts` handles the common case).
 
@@ -306,10 +415,13 @@ The existing `/v1/keys` Mailgun-compat handlers stay untouched as a pure mock. C
 
 ```
 main.ts → GET /mock/auth-config → {enabled: false}
-       → mount app
+       → startWebSocket() → mount app
 api.get("/v4/domains") → no Authorization header
-APIAuth middleware → "full" mode → passes through
+APIAuth middleware → validator == nil → disabled-mode Basic arm
+                   → mock config default "accept_any" → passes through
 ```
+
+(The mock config default is `accept_any`, set in `internal/mock/handlers.go:82`. Any other mock-config mode would 401 a request with no `Authorization` header — so contributors running with `full` / `single` / `managed_keys` locally will see 401s from the SPA until they either change mode or send credentials.)
 
 ### 2. First visit, auth enabled
 
@@ -345,22 +457,29 @@ Go: APIAuth middleware sees Bearer → Validator.Validate(jwt) → ok
   → dh.ListDomains runs
 ```
 
-### 5. Test app calling `/v3/domain.com/messages.mime`
+### 5. Test app calling `/v3/domain.com/messages.mime` (entra mode)
 
 ```
 SDK sends: Authorization: Basic api:<managed-key>
-APIAuth middleware: no Bearer → falls through to Basic path
-  → managed_keys mode: DB lookup in managed_api_keys table
+APIAuth middleware: no Bearer → validator != nil (entra mode)
+  → entra-mode Basic arm: DB lookup in managed_api_keys table (unconditional,
+    independent of mock.MockConfig.Authentication.AuthMode)
   → found → mh.SendMIMEMessage runs
 ```
+
+If the SDK presents an unknown password: 401, regardless of what the runtime mock config says. The mock config's `full` / `single` / `accept_any` / `managed_keys` values only take effect in `disabled` mode.
 
 ### 6. WebSocket
 
 ```
-useWebSocket → get token → new WebSocket(`/mock/ws?access_token=${jwt}`)
+main.ts bootstrap() → (after auth is ready) → startWebSocket()
+  → await getWSUrl() → acquireTokenSilent() → jwt
+  → new WebSocket(`/mock/ws?access_token=${jwt}`)
 EntraRequired → extract ?access_token → Validator.Validate → ok
 hub.HandleWebSocket runs
 ```
+
+Note the explicit `startWebSocket()` call from `main.ts`. The `useWebSocket` module deliberately does **not** connect on import — if it did, `App.vue`'s import chain would trigger the connect before `main.ts` awaits the auth bootstrap, and the WS would open with no token.
 
 ### 7. Token expiry mid-session
 
@@ -369,25 +488,42 @@ hub.HandleWebSocket runs
 ## Error handling & edge cases
 
 - **Startup validation.** In `entra` mode, `cmd/server/main.go` fails fast on missing `ENTRA_*` vars. In `disabled` mode bound to a non-loopback address, log a big warning: "Auth is disabled and server is listening on a public interface — test data is unprotected."
-- **JWKS / discovery unreachable at startup.** `oidc.NewProvider` fails → server exits. Transient JWKS failures during validation return 503 (not 401) so clients can distinguish "bad token" from "our problem."
-- **Invalid tokens.** Missing → 401 `unauthenticated`. Malformed/wrong sig/wrong iss/wrong aud/expired → 401 `invalid token`. JWKS fetch failure → 503 `auth provider unavailable`.
+- **JWKS / discovery unreachable at startup.** `oidc.NewProvider` fails → server exits.
+- **JWKS fetch failure during validation (H6).** The validator detects `*url.Error` / `net.Error` from `verifier.Verify` and wraps with `auth.ErrProviderUnavailable`. Middleware checks `errors.Is(err, auth.ErrProviderUnavailable)` and returns **503** `auth provider unavailable` with `WWW-Authenticate: Bearer error="temporarily_unavailable"`. All other validation errors return 401. This lets SDK clients and monitoring distinguish "bad token" (retry won't help) from "our problem" (retry will help).
+- **Invalid tokens (H4 + H6).** Missing → 401 `unauthenticated` + `WWW-Authenticate: Bearer realm="mailgun-mock-api"`. Malformed/wrong sig/wrong iss/wrong aud/expired/missing-scope → 401 `invalid token` + same Bearer challenge. JWKS fetch failure → 503 (see above). Basic-arm 401s use `WWW-Authenticate: Basic realm="mailgun-mock-api"`.
 - **Clock skew.** go-oidc tolerates small `iat`/`exp` drift internally. No action.
 - **No API keys minted yet.** Fresh deployed instance has an empty `managed_api_keys` table. `ApiKeysPage` shows a one-time empty state explaining the consequence. Server logs key count at startup in deployed mode.
 - **WebSocket token in query string leaking to logs.** Custom logging middleware for `/mock/ws` strips `?access_token=...` before logging. Unit tested.
+- **WebSocket token expiry and revocation window (H5).** `EntraRequired` only validates on the initial handshake. A JWT is accepted for its full ~1h lifetime, and a user whose Entra account is revoked mid-session keeps streaming events until they next reconnect. Full mitigation (re-validating on a timer, maintaining an expiry tracker per connection) is heavyweight for a mock. Narrow fix: **the hub forcibly closes each WS connection 30 minutes after it opens** (`time.AfterFunc` armed at `HandleWebSocket` entry, writes a `CloseMessage(1001, "reauth")` and closes the underlying conn). The SPA's reconnect logic (Task 17's `scheduleReconnect`) then re-runs `getWSUrl()`, which re-acquires a fresh JWT via MSAL, and opens a new connection that goes through `EntraRequired.Validate` again. This bounds the "revoked user still has access" window to 30 minutes without server-side token tracking. This is a narrow-scope, deliberate trade-off — documented here so reviewers know it's not an oversight. Only armed when `v != nil` (entra mode); disabled-mode connections are untouched.
 - **Key uniqueness.** `mock_<base64url(32 random bytes)>` with `UNIQUE` constraint and one retry on collision.
-- **Vite dev proxy.** `web/vite.config.ts` already proxies `/mock` and the Mailgun-compat paths. Local Entra usage with `http://localhost:5173` as redirect URI is documented in `E2E_TESTING.md` but not required for normal dev.
+- **Vite dev proxy.** `web/vite.config.ts` already proxies `/mock` and the Mailgun-compat paths. Local Entra usage with `http://localhost:5173` as redirect URI is documented in `README.md`'s Authentication section (Task 21) — both `:5173` (Vite dev) and `:8025` (Go binary direct) should be added to the app registration so either workflow works. Not required for normal dev since the default `disabled` mode sidesteps Entra entirely.
 - **Revocation.** DB-backed, no caching layer. `DELETE /mock/api-keys/{id}` takes effect on the next request.
 
 ## Testing strategy
 
 ### Unit tests (Go)
 
-- **`internal/auth/validator_test.go` (new).** `httptest.Server` serving a fake `.well-known/openid-configuration` + JWKS with a test RSA key. Generate signed JWTs in the test for each case: valid / expired / wrong audience / wrong issuer / unsigned. Assert outcomes.
-- **`internal/middleware/middleware_test.go` (extend).**
-  - `TestAPIAuth_DualPath` — Bearer path valid/invalid/expired; Basic path valid managed key / unknown key / empty; mixed (invalid Bearer does not fall through).
-  - `TestEntraRequired` — header path and `?access_token` path, REST and WS scenarios.
-- **`internal/apikey/managed_handlers_test.go` (new).** CRUD coverage for `/mock/api-keys`.
-- **`internal/config/config_test.go` (new or extend).** Missing `ENTRA_*` in `entra` mode → error; `disabled` mode with empty Entra vars → ok.
+- **`internal/auth/validator_test.go` (new, Task 2).** `httptest.Server` serving a fake `.well-known/openid-configuration` + JWKS with a test RSA key; signed JWTs generated in-test via `golang-jwt/jwt/v5`. Cases: valid-with-scope / missing-scope / scope-among-several / expired / wrong-aud / wrong-iss / malformed / **JWKS-unreachable asserts `errors.Is(err, auth.ErrProviderUnavailable)`** (H6).
+- **`internal/middleware/auth_test.go` (extend, Tasks 6 / 7 / 8).**
+  - Task 6: `TestBasicAuth_ManagedKeys_Valid|Invalid|EmptyTable`.
+  - Task 7 (APIAuth): Bearer-valid / Bearer-invalid-no-fallthrough / Bearer-nil-validator-401 / EntraBasic-valid-managed-key / EntraBasic-invalid-key-401 / **`TestAPIAuth_EntraBasic_IgnoresMockConfigFullMode` — the Critical-#2 regression test** / `Bearer_Invalid_SetsBearerChallenge` (H4) / `Basic_Invalid_SetsBasicChallenge` (H4) / `Bearer_ProviderUnavailable_503` (H6).
+  - Task 8 (EntraRequired): disabled-passthrough / header-valid / header-invalid-Bearer-challenge / query-param-valid / query-param-invalid / no-token-401-Bearer-challenge / `ProviderUnavailable_503`.
+- **`internal/middleware/ws_logging_test.go` (new, Task 9).** `WSLogScrubber_RedactsAccessToken|LeavesOtherParams|NoQueryParams`.
+- **`internal/apikey/managed_handlers_test.go` (new, Task 5).** CRUD coverage for `/mock/api-keys`: empty list / create / create-empty-name-400 / list-after-create / delete / list-after-delete.
+- **`internal/config/config_test.go` (new or extend, Task 1).** Missing `ENTRA_*` in `entra` mode → error; `disabled` mode with empty Entra vars → ok.
+- **`internal/mock/auth_config_test.go` (new, Task 10).** `GetAuthConfig_Disabled` / `GetAuthConfig_Enabled`.
+
+### Integration test (Go)
+
+- **`internal/server/server_entra_test.go` (new, Task 11, H12).** One test boots the full `server.New` in entra mode pointed at a fake OIDC provider, and walks the 8-case scenario in Task 11 — proves the actual wiring works end-to-end. This is the only auth-enabled server-level test; unit tests above cover isolated pieces. Includes:
+  - `/mock/health` → 200 unauthenticated (regression test for H10 health-placement fix)
+  - `/mock/auth-config` → 200 unauthenticated
+  - `/v4/domains` no auth → 401 + `WWW-Authenticate: Basic realm=...`
+  - `/v4/domains` expired Bearer → 401 + `WWW-Authenticate: Bearer realm=...`
+  - `/v4/domains` valid Bearer (correct aud + scp) → 200
+  - `/v4/domains` Basic with unknown key → 401 (Critical-#2 regression at the wiring level)
+  - Mint a key via `/mock/api-keys`, re-hit `/v4/domains` with Basic → 200
+  - `/mock/dashboard` no token → 401 + `WWW-Authenticate: Bearer`
 
 ### Existing tests
 
@@ -395,25 +531,24 @@ All run with `AUTH_MODE=disabled` (the zero value). No existing test changes. Th
 
 ### E2E (Playwright)
 
-- **`web/e2e/api-keys.spec.ts` (new).** Five specs against a server with auth disabled: create a key, see it in the list, copy-to-clipboard modal shows plaintext, delete, list empty.
-- **Full Entra redirect flow** — not automated. Documented as manual verification in `E2E_TESTING.md`.
+- **`web/e2e/api-keys.spec.ts` (new, Task 23).** Five specs against a server with auth disabled: create a key, see it in the list, copy-to-clipboard modal shows plaintext, delete, list empty.
+- **Full Entra redirect flow** — not automated. Documented as manual verification in `README.md` (Task 21) and `E2E_TESTING.md` (Task 22).
 
 ### Not tested (and why)
 
 - The MSAL SPA flow itself — it's Microsoft's library; mocking the identity provider in a browser is more work than value.
-- `/mock/auth-config` with `enabled: true` — covered implicitly by config unit tests.
+- `/mock/auth-config` with `enabled: true` — covered by Task 10's `GetAuthConfig_Enabled` unit test and the Task 11 integration test.
 
 ## Documentation updates
 
 ### `README.md` — new "Authentication" section
 
-- Local dev default: auth is off, nothing to configure.
-- Enabling Entra ID for deployed instances:
-  - Step-by-step app registration: set `accessTokenAcceptedVersion: 2`, configure SPA platform with redirect URI, expose API scope `access_as_user`.
-  - Env vars to set: `AUTH_MODE=entra`, `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_API_SCOPE`, `ENTRA_REDIRECT_URI`.
-  - How to mint the first API key from the UI after signing in.
-  - How test apps use the minted keys (Basic Auth `api:<key>` — unchanged from today).
-- Troubleshooting: token version mismatch, missing redirect URI, 401s on test apps when no keys exist.
+Full content spec lives in **Task 21** (below). At a high level the section covers:
+- Local dev default (auth off, nothing to configure).
+- Enabling Entra ID for deployed instances: 7-step app registration walkthrough including SPA redirect URIs (both local ports for dev testing — H9), logout URL, exposed API scope, `accessTokenAcceptedVersion: 2`, and optional `groupMembershipClaims: "SecurityGroup"` for future group authz (H13).
+- Env vars table.
+- First-API-key walkthrough + how test apps use minted keys.
+- Five troubleshooting entries (token version, redirect URI mismatch, missing API key, `invalid_scope`, 503 from JWKS egress).
 
 ### `E2E_TESTING.md`
 
@@ -422,13 +557,17 @@ New manual-verification section for the full Entra flow.
 ## Summary of decisions
 
 1. **Entra ID (MSAL, self-hosted option C)** protects `/mock/*`, `/mock/ws`, and — via dual-auth — `/v3/*`, `/v4/*` etc. when called from the browser.
-2. **Managed API keys** stored plaintext in DB, minted from the UI, used by test apps via Basic Auth.
-3. **Single Entra app registration** with SPA platform + exposed API scope.
-4. **Bootstrap config endpoint** (`/mock/auth-config`) keeps the SPA bundle config-free.
+2. **Managed API keys** stored plaintext in DB, minted from the UI, used by test apps via Basic Auth. In entra mode this is the *only* accepted Basic-Auth credential — `mock.MockConfig.Authentication.AuthMode` is ignored.
+3. **Single Entra app registration** with SPA platform + exposed API scope + logout redirect URI.
+4. **Bootstrap config endpoint** (`/mock/auth-config`) keeps the SPA bundle config-free. Typed as a TypeScript discriminated union on the frontend.
 5. **Both auth layers opt-in** via `AUTH_MODE` — zero impact on local dev and existing tests.
-6. **`github.com/coreos/go-oidc/v3`** as the sole new Go dependency; **`@azure/msal-browser`** as the sole new npm dependency.
-7. **WebSocket token in query string** (option A) with log scrubbing middleware.
-8. **No group filtering** for now; deferred.
+6. **`github.com/coreos/go-oidc/v3`** as the sole new Go dependency; **`@azure/msal-browser`** as the sole new npm dependency. Task 11 also **removes** the unused `github.com/go-chi/cors` dependency — the architecture is same-origin by construction, so CORS headers serve no purpose.
+7. **`scp` claim validated** against `ENTRA_API_SCOPE` (bare name). Tokens minted for other scopes against the same audience are rejected.
+8. **WebSocket token in query string** (option A) with log scrubbing middleware. Server forcibly closes entra-mode WS connections every 30 minutes to bound the token-revocation window.
+9. **Sign-out uses `logoutRedirect`** — local-cache-only sign-out is not offered, to avoid the "signed out but silently re-authenticates" UX trap.
+10. **401 responses carry `WWW-Authenticate`** with the appropriate challenge scheme (Bearer on JWT/Entra paths, Basic on managed-key paths). JWKS fetch failures translate to 503 + `temporarily_unavailable` so SDK clients and monitoring can distinguish retriable from non-retriable failures.
+11. **No CORS middleware** — the embedded SPA and the API share one origin; the Vite dev proxy keeps local dev same-origin too. Mailgun SDKs are server-side and never cross a browser origin.
+12. **No group filtering** for now; deferred. Documentation tells operators how to enable group claims in the app registration so the future follow-up is a pure code change.
 
 ---
 
@@ -467,18 +606,29 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 
 **Details:**
 - Add dependency: `go get github.com/coreos/go-oidc/v3@latest`.
-- Define `Claims` struct with `OID`, `Email` (from `preferred_username`), `Name`.
-- Define `Validator` struct wrapping `*oidc.IDTokenVerifier`.
-- `NewValidator(ctx context.Context, tenantID, expectedAud string) (*Validator, error)` constructs issuer URL (`https://login.microsoftonline.com/<tenant>/v2.0`), calls `oidc.NewProvider`, and builds a verifier with `ClientID: expectedAud`.
-- `Validate(ctx, raw string) (*Claims, error)` calls `verifier.Verify` and extracts claims.
-- Tests: run an `httptest.NewServer` that serves a fake `.well-known/openid-configuration` and JWKS using an RSA test key (`crypto/rsa` + `jwt.SigningMethodRS256`). Use `github.com/golang-jwt/jwt/v5` (transitive via go-oidc) to **sign test tokens**. Cases: valid token → claims extracted; expired token → error; wrong audience → error; wrong issuer → error; malformed → error.
+- Define `Claims` struct with `OID`, `Email` (from `preferred_username`), `Name`, `Scope` (from `scp`).
+- Define `Validator` struct wrapping `*oidc.IDTokenVerifier` and a `requiredScope` string.
+- Export sentinel error `ErrProviderUnavailable` (see H6) for callers to distinguish JWKS/network failures from token-content failures.
+- `NewValidator(ctx context.Context, tenantID, expectedAud, requiredScope string) (*Validator, error)` constructs issuer URL (`https://login.microsoftonline.com/<tenant>/v2.0`), calls `oidc.NewProvider`, and builds a verifier with `ClientID: expectedAud`.
+- `Validate(ctx, raw string) (*Claims, error)` calls `verifier.Verify`, extracts claims, AND verifies the `scp` claim contains `requiredScope` (space-delimited list — use `strings.Fields` and an exact match). An empty `requiredScope` disables the check (used by tests that want to isolate audience/issuer verification from scope handling). When `verifier.Verify` returns a `*url.Error` / `net.Error`, wrap with `ErrProviderUnavailable` via `fmt.Errorf("%w: ...", auth.ErrProviderUnavailable, err)`.
+- Tests: run an `httptest.NewServer` that serves a fake `.well-known/openid-configuration` and JWKS using an RSA test key (`crypto/rsa` + `jwt.SigningMethodRS256`). Use `github.com/golang-jwt/jwt/v5` to sign test tokens — **add it as a direct dependency** (`go get github.com/golang-jwt/jwt/v5`) rather than relying on the transitive pull via go-oidc. Cases:
+  - valid token with required scope → claims extracted, Scope field populated
+  - valid token missing required scope → error containing "missing required scope"
+  - valid token with required scope among several → claims extracted
+  - expired token → error
+  - wrong audience → error
+  - wrong issuer → error
+  - malformed token → error
+  - **JWKS unreachable (H6)**: stop the httptest server before calling `Validate` (or use a guaranteed-closed port), assert the returned error satisfies `errors.Is(err, auth.ErrProviderUnavailable)`
 - **Note on gotcha:** test tokens should use issuer `<httptest-server-url>/v2.0` to match what `NewValidator` builds — parameterize via an internal `newValidatorForIssuer` helper the test can call.
 
 **Checklist:**
 - [ ] `go get github.com/coreos/go-oidc/v3@latest`
-- [ ] Write `validator.go` with `Claims`, `Validator`, `NewValidator`, `Validate`
-- [ ] Expose an unexported `newValidatorForIssuer(ctx, issuerURL, aud)` used by tests only
-- [ ] Write `validator_test.go` with the five cases above
+- [ ] `go get github.com/golang-jwt/jwt/v5@latest` (direct test dep)
+- [ ] Export `ErrProviderUnavailable` sentinel
+- [ ] Write `validator.go` with `Claims` (incl. `Scope`), `Validator` (incl. `requiredScope`), `NewValidator`, `Validate` with scope check and JWKS-failure translation
+- [ ] Expose an unexported `newValidatorForIssuer(ctx, issuerURL, aud, requiredScope)` used by tests only
+- [ ] Write `validator_test.go` with the eight cases above (incl. `ErrProviderUnavailable` assertion)
 - [ ] `go test ./internal/auth/...` passes
 - [ ] `go build ./...` still compiles
 
@@ -558,11 +708,13 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 
 ---
 
-### Task 6: Add `managed_keys` mode to Basic-path auth
+### Task 6: Add `managed_keys` mode to Basic-path auth (disabled-mode pathway)
 
 **Files to modify:** `internal/middleware/middleware.go`, `internal/middleware/auth_test.go`
 
 **Pattern reference:** Existing `BasicAuth` switch at `internal/middleware/middleware.go:85-118`. Existing tests in `auth_test.go`.
+
+**Note on scope:** This task only adds the `managed_keys` *enum value* to the existing mock-config switch. This pathway is consulted only when entra is disabled — it exists so contributors can exercise the managed-keys lookup locally, and so Task 6's unit tests can isolate the DB lookup from JWT validation. Task 7 separately adds the entra-mode Basic-path override that bypasses this switch entirely.
 
 **Details:**
 - Add a `case "managed_keys":` branch to the switch. Extract `username, password, ok := r.BasicAuth()`; on mismatch of format → 401; otherwise `db.Where("key_value = ?", password).First(&apikey.ManagedAPIKey{})`; not-found → 401; found → pass through.
@@ -580,7 +732,7 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 
 ---
 
-### Task 7: Rename `BasicAuth` → `APIAuth` with dual-auth Bearer path
+### Task 7: Rename `BasicAuth` → `APIAuth` with dual-auth Bearer path + entra-mode Basic override
 
 **Files to modify:** `internal/middleware/middleware.go`, `internal/middleware/auth_test.go`, `internal/server/server.go`
 
@@ -588,17 +740,34 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 
 **Details:**
 - Rename `BasicAuth` → `APIAuth`. Update all call sites in `server.go`.
-- Extend signature: `APIAuth(cfg *mock.MockConfig, db *gorm.DB, v *auth.Validator) func(http.Handler) http.Handler`. A `nil` validator means Entra is disabled — skip Bearer path entirely.
-- At the top of the handler body, **before** the existing Basic switch: check for `Authorization: Bearer <token>`. If present and `v != nil`, call `v.Validate(r.Context(), token)`; on success, pass through; on failure, **return 401 directly — do NOT fall through to Basic** (avoids ambiguous error cases).
-- Helper function `extractBearer(r *http.Request) string` (exported lowercase since used by Task 8 too — put in the same file).
-- New tests: `TestAPIAuth_Bearer_ValidToken`, `TestAPIAuth_Bearer_InvalidToken_NoFallthrough`, `TestAPIAuth_Bearer_DisabledValidator_FallthroughToBasic`. Use the `newValidatorForIssuer` helper from Task 2 + a fake JWKS httptest server.
+- Extend signature: `APIAuth(cfg *mock.MockConfig, db *gorm.DB, v *auth.Validator) func(http.Handler) http.Handler`. A `nil` validator means Entra is disabled.
+- Handler body has three sequential arms:
+  1. **Bearer arm.** If `extractBearer(r) != ""`: require `v != nil` (else 401); call `v.Validate`; success → pass through; failure → 401, **no fall-through** (avoids ambiguous error cases).
+  2. **Entra-mode Basic arm.** If no Bearer AND `v != nil`: do managed-keys DB lookup directly (same logic as Task 6's `managed_keys` case but hardcoded in this branch — do NOT consult `cfg.Authentication.AuthMode`). Not found → 401. This is the structural anti-footgun — in entra mode the runtime mock config cannot weaken the Basic-path check.
+  3. **Disabled-mode Basic arm.** If no Bearer AND `v == nil`: existing switch on `cfg.Authentication.AuthMode` (now including Task 6's `managed_keys` case).
+- Helper function `extractBearer(r *http.Request) string` (unexported; used by Task 8 too — put in the same file).
+- Every 401 response MUST set `WWW-Authenticate` (H4):
+  - Bearer-arm 401s: `WWW-Authenticate: Bearer realm="mailgun-mock-api"`.
+  - Basic-arm 401s (both entra-mode and disabled-mode): `WWW-Authenticate: Basic realm="mailgun-mock-api"`.
+- When `Validate` returns an error wrapping `auth.ErrProviderUnavailable` (H6), return 503 with `WWW-Authenticate: Bearer error="temporarily_unavailable"` — use `errors.Is(err, auth.ErrProviderUnavailable)` to detect.
+- New tests:
+  - `TestAPIAuth_Bearer_ValidToken`, `TestAPIAuth_Bearer_InvalidToken_NoFallthrough`, `TestAPIAuth_Bearer_DisabledValidator_401` (when v == nil and Bearer is present, return 401 — not fall through to Basic, since the caller is clearly trying to use Bearer and silently accepting anything would be a footgun of its own).
+  - `TestAPIAuth_EntraBasic_ValidManagedKey`, `TestAPIAuth_EntraBasic_InvalidKey_401`, `TestAPIAuth_EntraBasic_IgnoresMockConfigFullMode` — the last test explicitly sets `cfg.Authentication.AuthMode = "full"` with a validator present and asserts that a request with a nonsense Basic password is still 401'd. This is the regression test for Critical #2.
+  - `TestAPIAuth_Bearer_Invalid_SetsBearerChallenge` — 401 response carries `WWW-Authenticate: Bearer realm=...` (H4).
+  - `TestAPIAuth_Basic_Invalid_SetsBasicChallenge` — 401 response carries `WWW-Authenticate: Basic realm=...` (H4).
+  - `TestAPIAuth_Bearer_ProviderUnavailable_503` — construct a validator whose JWKS URL points at a stopped server; assert the response is 503 with `WWW-Authenticate: Bearer error="temporarily_unavailable"` (H6).
+  - Use the `newValidatorForIssuer` helper from Task 2 + a fake JWKS httptest server.
 
 **Checklist:**
 - [ ] Rename `BasicAuth` → `APIAuth` with new signature
-- [ ] Implement Bearer path with fail-fast on invalid token
-- [ ] Add `extractBearer` helper
+- [ ] Implement Bearer arm with fail-fast on invalid token
+- [ ] Implement entra-mode Basic arm (managed-keys lookup, bypassing mock config)
+- [ ] Preserve disabled-mode Basic arm behavior unchanged
+- [ ] Add `extractBearer`, `unauthorized`, `providerUnavailable` helpers
+- [ ] All 401s set `WWW-Authenticate` with the correct scheme (H4)
+- [ ] `ErrProviderUnavailable` maps to 503 + `Bearer error="temporarily_unavailable"` (H6)
 - [ ] Update all call sites in `server.go`
-- [ ] Add 3 new tests
+- [ ] Add 9 new tests (6 original + 3 for H4/H6)
 - [ ] `go test ./internal/middleware/...` passes
 - [ ] `go build ./...` passes
 
@@ -612,12 +781,22 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 
 **Details:**
 - `EntraRequired(v *auth.Validator) func(http.Handler) http.Handler` — one function, handles both REST and WS via dual token extraction.
-- Logic: if `v == nil`, pass through (disabled mode). Otherwise extract token from `Authorization: Bearer <token>` OR from `?access_token=<token>` query param. No token → 401. Validate → 401 on failure, pass through on success.
-- Tests: `TestEntraRequired_DisabledPassthrough`, `TestEntraRequired_Header_Valid`, `TestEntraRequired_Header_Invalid`, `TestEntraRequired_QueryParam_Valid` (WS simulation), `TestEntraRequired_NoToken_401`.
+- Logic: if `v == nil`, pass through (disabled mode). Otherwise extract token from `Authorization: Bearer <token>` OR from `?access_token=<token>` query param. No token → 401 with `WWW-Authenticate: Bearer realm=...` (H4). Validate → if `errors.Is(err, auth.ErrProviderUnavailable)` return 503 with `WWW-Authenticate: Bearer error="temporarily_unavailable"` (H6), else 401 with Bearer challenge. Success → pass through.
+- Uses the same `unauthorized` / `providerUnavailable` helpers defined in Task 7.
+- Tests:
+  - `TestEntraRequired_DisabledPassthrough`
+  - `TestEntraRequired_Header_Valid`
+  - `TestEntraRequired_Header_Invalid_BearerChallenge` — asserts 401 + `WWW-Authenticate: Bearer realm=...`
+  - `TestEntraRequired_QueryParam_Valid` (WS simulation)
+  - `TestEntraRequired_QueryParam_Invalid` (WS simulation with bad token — 401 + Bearer challenge)
+  - `TestEntraRequired_NoToken_401_BearerChallenge`
+  - `TestEntraRequired_ProviderUnavailable_503` — validator pointed at a stopped JWKS server; assert 503 + `WWW-Authenticate: Bearer error="temporarily_unavailable"`
 
 **Checklist:**
 - [ ] Implement `EntraRequired` with header + query-param extraction
-- [ ] Add 5 new tests
+- [ ] All 401s set `WWW-Authenticate: Bearer realm=...`
+- [ ] `ErrProviderUnavailable` maps to 503
+- [ ] Add 7 new tests
 - [ ] `go test ./internal/middleware/...` passes
 
 ---
@@ -675,35 +854,86 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 
 ---
 
-### Task 11: Wire auth into `server.New()`
+### Task 11: Wire auth into `server.New()` (+ remove unused CORS, move `/mock/health`)
 
-**Files to modify:** `internal/server/server.go`, `cmd/server/main.go`
+**Files to modify:** `internal/server/server.go`, `cmd/server/main.go`, `go.mod`, `go.sum`
 
 **Pattern reference:** Existing route-wrapping style in `server.go:118-442`.
 
 **Details:**
+
+This task is larger than the others because it's the point where auth becomes real in the running server, and where two pre-existing cleanups the plan touches anyway are resolved.
+
+*Signature + validator construction*
 - Change signature: `func New(ctx context.Context, db *gorm.DB, cfg *config.Config) http.Handler`.
-- At the top of `New`, if `cfg.AuthMode == "entra"`, construct `validator, err := auth.NewValidator(ctx, cfg.EntraTenantID, "api://"+cfg.EntraClientID)`; `log.Fatalf` on error. Otherwise `validator = nil`.
+- At the top of `New`, if `cfg.AuthMode == "entra"`, construct `validator, err := auth.NewValidator(ctx, cfg.EntraTenantID, "api://"+cfg.EntraClientID, cfg.EntraAPIScope)`; `log.Fatalf` on error. Otherwise `validator = nil`. Note the third argument is the bare scope name from config (e.g. `access_as_user`), not the fully-qualified `api://<client-id>/access_as_user` form — the `scp` claim only carries the bare name.
 - Update `mock.NewHandlers` call to pass `cfg` (from Task 10).
-- Replace every `appMiddleware.BasicAuth(h.Config())` call with `appMiddleware.APIAuth(h.Config(), db, validator)`. (There are ~30 of these — use a careful find/replace.)
-- Wrap all `/mock/*` routes with `EntraRequired(validator)`. The `/mock` route group starts at line 412 — add `r.Use(appMiddleware.EntraRequired(validator))` at the top of the `r.Route("/mock", ...)` block. **Exception:** `/mock/auth-config` and `/mock/health` must NOT be wrapped. Place these two routes OUTSIDE the `r.Route("/mock", ...)` block, or use a nested `r.Group` that does not inherit `EntraRequired`.
-- Register the new `/mock/auth-config` route (unauthenticated): `r.Get("/mock/auth-config", h.GetAuthConfig)`.
-- Register the new `/mock/api-keys` routes inside the Entra-protected `/mock` group: `r.Get("/api-keys", mkh.List); r.Post("/api-keys", mkh.Create); r.Delete("/api-keys/{id}", mkh.Delete)`.
+
+*Remove the CORS middleware (H7)*
+- The embedded SPA and the API are served by the same Go process on the same port (`//go:embed all:static` + `spaHandler()` + `r.Handle("/*", spaHandler())`). `just dev-ui` uses a Vite server-side proxy. Browsers never cross an origin; Mailgun SDKs call server-to-server. **There is no cross-origin caller in the threat model.**
+- Delete the `cors.Handler(cors.Options{...})` block at `server.go:40-46` entirely.
+- Remove the `"github.com/go-chi/cors"` import.
+- `go mod tidy` to drop the dependency from `go.mod` / `go.sum`.
+- This also resolves the pre-existing `AllowedOrigins: ["*"]` + `AllowCredentials: true` spec violation by deletion.
+
+*Route-level auth wiring*
+- Replace every `appMiddleware.BasicAuth(h.Config())` call with `appMiddleware.APIAuth(h.Config(), db, validator)`. (There are ~30 of these — careful find/replace.)
+- Wrap all `/mock/*` routes with `EntraRequired(validator)`: at the top of the `r.Route("/mock", ...)` block (currently `server.go:412`), add `r.Use(appMiddleware.EntraRequired(validator))`.
+- Register the new `/mock/api-keys` routes *inside* the Entra-protected `/mock` group: `r.Get("/api-keys", mkh.List); r.Post("/api-keys", mkh.Create); r.Delete("/api-keys/{id}", mkh.Delete)`.
 - Apply `WSLogScrubber` + `EntraRequired` to the `/mock/ws` route specifically.
+
+*Move `/mock/health` and `/mock/auth-config` out of the Entra-protected group (H10)*
+- Today `/mock/health` is registered *inside* `r.Route("/mock", ...)` at `server.go:414`. Once `r.Use(EntraRequired)` is added to that group, `/mock/health` inherits it — which breaks load-balancer health probes and Kubernetes liveness checks.
+- Remove `r.Get("/health", mock.HealthHandler)` from the `/mock` group.
+- Register both public endpoints at the root router *before* the `/mock` group is defined:
+  ```go
+  r.Get("/mock/health", mock.HealthHandler)
+  r.Get("/mock/auth-config", h.GetAuthConfig)
+  r.Route("/mock", func(r chi.Router) {
+      r.Use(appMiddleware.EntraRequired(validator))
+      // ... rest of /mock routes, minus /health ...
+  })
+  ```
+- Verify by diff that `/health` no longer appears inside the `/mock` group block.
+
+*Arm the 30-minute WS reauth timer (H5)*
+- In the WebSocket hub's `HandleWebSocket` method (or a thin wrapper registered on the `/mock/ws` route when `validator != nil`), after the connection is upgraded, arm `time.AfterFunc(30*time.Minute, func() { conn.WriteMessage(websocket.CloseMessage, ...); conn.Close() })`. Cancel the timer on normal close. See the Error handling section for the rationale.
+- Only armed when `validator != nil` (disabled-mode connections keep current behavior).
+- If the existing hub does not expose a per-connection hook, add a minimal middleware at the route level that wraps `hub.HandleWebSocket` and arms the timer after the handshake.
+
+*Main.go*
 - Update `cmd/server/main.go` to call `server.New(ctx, db, cfg)`.
+
+*Entra-mode end-to-end integration test (H12)*
+New file: `internal/server/server_entra_test.go`. One test function that boots `server.New` in entra mode pointed at a fake OIDC provider (httptest server reusing Task 2's RSA test keys + a fake JWKS), then asserts:
+1. `GET /mock/health` → 200 (unauthenticated — the group exception works).
+2. `GET /mock/auth-config` → 200 `{"enabled": true, ...}` (unauthenticated).
+3. `GET /v4/domains` with no auth → 401 + `WWW-Authenticate: Basic realm=...`.
+4. `GET /v4/domains` with an expired Bearer → 401 + `WWW-Authenticate: Bearer realm=...`.
+5. `GET /v4/domains` with a valid Bearer (signed by the fake JWKS, correct aud, correct scp) → 200.
+6. `GET /v4/domains` with Basic `api:<unknown-key>` → 401. **Regression test for Critical #2 at the wiring level** — even though the mock config defaults to `full` (accept any non-empty password), entra mode must reject unknown Basic passwords.
+7. `POST /mock/api-keys` with valid Bearer creates a key; then `GET /v4/domains` with Basic `api:<that-key>` → 200.
+8. `GET /mock/dashboard` with no token → 401 + `WWW-Authenticate: Bearer`.
+
+This is the only server-level auth-enabled test; unit tests in Task 2 / Task 7 / Task 8 still cover the isolated pieces, but this test is what proves the wiring itself works.
 
 **Checklist:**
 - [ ] Change `server.New` signature
 - [ ] Construct validator at startup in entra mode
+- [ ] **Delete `cors.Handler` block and import; run `go mod tidy`**
 - [ ] Replace all `BasicAuth` call sites with `APIAuth`
 - [ ] Wrap `/mock/*` group with `EntraRequired`
-- [ ] Place `/mock/auth-config` and `/mock/health` outside the Entra-protected group
-- [ ] Wire `/mock/api-keys` CRUD routes
-- [ ] Apply WS scrubber to `/mock/ws`
+- [ ] **Move `/mock/health` out of the `/mock` group (register at root)**
+- [ ] Register `/mock/auth-config` at root (not inside the `/mock` group)
+- [ ] Wire `/mock/api-keys` CRUD routes inside the Entra-protected group
+- [ ] Apply WS scrubber + `EntraRequired` to `/mock/ws`
+- [ ] Arm 30-minute WS reauth timer when `validator != nil`
 - [ ] Update `main.go` call site
-- [ ] `just build` succeeds
-- [ ] `go test ./...` passes (all existing tests must still pass with `AUTH_MODE=disabled` default)
+- [ ] Write `server_entra_test.go` with the 8 cases above
+- [ ] `just build` succeeds (catches missed call sites and the CORS removal)
+- [ ] `go test ./...` passes — both the existing disabled-mode tests and the new entra-mode test
 - [ ] Manual smoke: `just dev`, `curl localhost:8025/mock/auth-config` → `{"enabled":false}`
+- [ ] Manual smoke: `just dev`, `curl -i localhost:8025/mock/health` → 200 (confirms the routing move)
 
 ---
 
@@ -718,19 +948,25 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - `cd web && npm install @azure/msal-browser`.
 - Create `web/src/auth/config.ts`:
   ```ts
-  export interface AuthConfig {
-    enabled: boolean;
-    tenantId?: string;
-    clientId?: string;
-    scopes?: string[];
-    redirectUri?: string;
-  }
+  // Discriminated union: if enabled is true, all other fields are guaranteed present.
+  // This forecloses a class of "undefined deref in initMsal" bugs at the type level.
+  export type AuthConfig =
+    | { enabled: false }
+    | {
+        enabled: true;
+        tenantId: string;
+        clientId: string;
+        scopes: string[];
+        redirectUri: string;
+      };
+
   export async function fetchAuthConfig(): Promise<AuthConfig> {
     const res = await fetch("/mock/auth-config", { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error(`auth-config fetch failed: ${res.status}`);
     return res.json();
   }
   ```
+- Callers use `if (cfg.enabled) { cfg.tenantId /* known string */ }` narrowing — no `?.` or `!` needed.
 - No tests — this is a trivial fetch wrapper; covered end-to-end by Task 23.
 
 **Checklist:**
@@ -752,11 +988,15 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - Export `msalInstance: PublicClientApplication | null` (module-level, set by `initMsal`).
 - Export `getActiveAccount()`, `getAccessToken(): Promise<string | null>`, `signIn()`, `signOut()`.
 - `getAccessToken()` wraps `acquireTokenSilent({scopes, account: getActiveAccount()})` with a `.catch` for `InteractionRequiredAuthError` → `acquireTokenRedirect(...)`.
+- `signIn()` calls `msalInstance.loginRedirect({scopes})`.
+- **`signOut()` (H8)** calls `msalInstance.logoutRedirect({ postLogoutRedirectUri: window.location.origin, account: getActiveAccount() })`. This terminates the Entra tenant session — not just the local MSAL cache — and redirects the browser back to the SPA root. `main.ts`'s bootstrap re-runs on arrival and `loginRedirect` fires again because there is no longer an active account. **Do not** offer a local-cache-only sign-out variant: it would create a "signed out" user whose next silent token acquisition succeeds, which is confusing.
+- Requires `postLogoutRedirectUri` (the SPA root) to be registered in the Entra app registration under the SPA platform. Task 21 documents this.
 - MSAL config uses `cacheLocation: "localStorage"`.
 - No unit tests — MSAL is Microsoft's library; we trust it. Integration verification in Task 15's manual smoke.
 
 **Checklist:**
 - [ ] Create `msalInstance.ts` with the functions above
+- [ ] `signOut` uses `logoutRedirect` with `postLogoutRedirectUri`
 - [ ] `npm run lint` passes
 - [ ] `npm run build` succeeds
 
@@ -819,23 +1059,55 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 
 ---
 
-### Task 17: Thread token into WebSocket URL
+### Task 17: Defer WebSocket connect + thread token into URL
 
-**Files to modify:** `web/src/composables/useWebSocket.ts`
+**Files to modify:** `web/src/composables/useWebSocket.ts`, `web/src/main.ts`
 
-**Pattern reference:** Current `getWSUrl` helper in the same file.
+**Pattern reference:** Current `getWSUrl` helper and module-level `connect()` call at the bottom of `useWebSocket.ts`. This task rewrites both.
 
 **Details:**
-- Make `getWSUrl()` async: await `getAccessToken()`; if token present, append `?access_token=${encodeURIComponent(token)}`. Otherwise return unchanged.
-- Update the call site that constructs `new WebSocket(url)` to `await getWSUrl()` first.
-- Reconnection logic re-runs `getWSUrl()` (which re-acquires a fresh token) each time — no additional changes needed for token refresh on long-lived connections.
+
+There are two coupled changes. Do them together — doing either alone leaves the WS broken in one of the two auth modes.
+
+1. **Defer the initial connect.** The current file ends with:
+
+   ```ts
+   // Initialize connection on first import
+   connect();
+   ```
+
+   This runs as soon as anything imports the module. `web/src/App.vue:3` imports `useWebSocket` at the top of its `<script setup>`, so the connect fires during `main.ts`'s `import App from "./App.vue"` — synchronously, before any `await` in `bootstrap()`. With Entra enabled, that means the WS opens with no token and is immediately 401'd.
+
+   Fix: **delete the module-level `connect()` call** and instead export a `startWebSocket()` function:
+
+   ```ts
+   export function startWebSocket() {
+     connect();
+   }
+   ```
+
+   The `useWebSocket()` composable itself becomes a pure consumer — it reads the reactive `connected` state and lets callers subscribe to messages, but never initiates the connection. Consumer components (`App.vue`, `DashboardPage.vue`, `EventsPage.vue`, `MessagesPage.vue`) do not change — they continue to call `useWebSocket()` as before.
+
+2. **Thread the token through `getWSUrl`.** Make `getWSUrl()` async:
+   - `const token = await getAccessToken();` (returns `null` in disabled mode).
+   - If token present, append `?access_token=${encodeURIComponent(token)}`.
+   - Otherwise return the URL unchanged (preserves disabled-mode behavior).
+   - Update `connect()` to `await getWSUrl()` before constructing `new WebSocket(url)`. `connect` becomes async.
+   - `scheduleReconnect` continues to work — it calls `connect()` which re-runs `getWSUrl()`, so a fresh token is acquired on each reconnect. This covers the "token expired mid-session, WS dropped, reconnect" path automatically.
+
+3. **Call `startWebSocket()` from `main.ts`.** At the end of `bootstrap()`, after auth is ready (in both branches — disabled and entra), call `startWebSocket()` before `createApp(...).mount(...)`. Task 15's bootstrap flow already has the branching; add `startWebSocket()` to both arms.
 
 **Checklist:**
-- [ ] Make `getWSUrl` async
-- [ ] Await it at connect and reconnect sites
+- [ ] Delete the module-level `connect()` call in `useWebSocket.ts`
+- [ ] Export `startWebSocket()` wrapping `connect()`
+- [ ] Make `getWSUrl` async; await `getAccessToken`; append `?access_token=...` when present
+- [ ] Make `connect()` async; await `getWSUrl()` before opening the socket
+- [ ] Verify reconnection path still works (re-runs `getWSUrl` → fresh token)
+- [ ] Call `startWebSocket()` from both arms of `main.ts`'s `bootstrap()`
 - [ ] `npm run lint` passes
 - [ ] `npm run build` succeeds
-- [ ] Manual smoke: `just dev`, open browser, confirm "Connected" indicator (WS still works in disabled mode)
+- [ ] Manual smoke (disabled mode): `just dev`, open browser, confirm "Connected" indicator appears and the WS URL in DevTools has no `access_token` param
+- [ ] Manual smoke (entra mode, once Task 21 is done): confirm the WS URL in DevTools has a `?access_token=<jwt>` param and "Connected" appears only after sign-in completes
 
 ---
 
@@ -849,10 +1121,12 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - Import `useAuth`. Get `user`, `isAuthenticated`, `signOut`.
 - In the `sidebar-header` block, under the connection status div, add `v-if="isAuthenticated"` block with `{{ user?.name }}` and a "Sign out" button (`@click="signOut"`). When disabled mode, `isAuthenticated` is false and this block never renders.
 - Styling: match existing sidebar typography; small text, muted color. Keep it minimal.
+- **Sign-out behavior (H8).** `signOut` resolves to Task 13's `logoutRedirect`-backed function. Clicking it triggers a full-page navigation to Entra's logout endpoint, which invalidates the tenant session and then redirects the browser to `window.location.origin`. `main.ts`'s bootstrap re-runs on arrival, and because the Entra session is gone, `loginRedirect` fires and the user lands on the Microsoft sign-in page. This is intentional — "sign out" must mean "gone until you re-authenticate," not "local cache cleared while tenant still trusts you."
 
 **Checklist:**
 - [ ] Import and use `useAuth`
 - [ ] Add conditional user block in sidebar header
+- [ ] Verify click-to-signout triggers Entra logout (not just local cache clear) — manual smoke once Task 21 lands
 - [ ] `npm run lint` passes
 - [ ] `npm run build` succeeds
 
@@ -910,20 +1184,32 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - New top-level section "Authentication" (before or after "Commands"). Subsections:
   - **Local development (default).** "Auth is disabled by default. `just dev` works without any Entra ID setup."
   - **Enabling Entra ID for deployed instances.**
-    - Numbered list for the Entra app registration: create app registration in Azure portal → add SPA platform with redirect URI matching `ENTRA_REDIRECT_URI` → expose an API with scope `access_as_user` → **set `accessTokenAcceptedVersion: 2` in the app manifest** (called out prominently) → copy Tenant ID and Client ID.
+    - Numbered list for the Entra app registration:
+      1. Create app registration in Azure portal.
+      2. Add the **SPA platform** and configure redirect URIs:
+         - For a deployed instance, add your public URL (matching `ENTRA_REDIRECT_URI`).
+         - **(H9) For local Entra testing**, add *both* `http://localhost:5173` (Vite dev server via `just dev-ui`) and `http://localhost:8025` (Go binary direct via `just dev` / `just run`). The SPA is served from a different port depending on which command you use; listing both lets contributors test the Entra flow under either workflow without switching app registrations.
+      3. Under the SPA platform, also register a **logout URL** (`postLogoutRedirectUri`) matching the SPA root — Task 13's `signOut` calls `logoutRedirect` which requires this. For deployed instances this is the same as `ENTRA_REDIRECT_URI`; for local it's the Vite and/or Go URL you added in step 2.
+      4. Expose an API with scope `access_as_user` (or whatever you plan to set `ENTRA_API_SCOPE` to — the scope name must match).
+      5. **Set `accessTokenAcceptedVersion: 2` in the app manifest** — called out prominently. Without this, issued tokens use the v1 issuer and validation fails.
+      6. **(H13) Optional: group-based authorization.** If you plan to add group filtering later, also set `"groupMembershipClaims": "SecurityGroup"` in the app manifest and re-consent. Without this, JWTs will not carry a `groups` claim regardless of code changes. This plan does not use group claims yet (see Non-goals), but this step makes the future work a one-line code change.
+      7. Copy Tenant ID and Client ID.
     - Env vars table: `AUTH_MODE`, `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_API_SCOPE`, `ENTRA_REDIRECT_URI` with descriptions.
     - First-run: "After deploying, sign in to the UI, navigate to Config → API Keys, create your first key. Give the key to your test apps — they use it as the Basic Auth password (`api:<key>`), exactly like a real Mailgun key."
-  - **Troubleshooting.** Three subsections:
+  - **Troubleshooting.** Subsections:
     - "Test apps get 401s" → check API key is created, check Basic Auth format.
     - "Issuer mismatch during token validation" → `accessTokenAcceptedVersion` is not set to 2.
-    - "Redirect loop on sign-in" → redirect URI in Entra app registration doesn't match `ENTRA_REDIRECT_URI`.
+    - "Redirect loop on sign-in" → redirect URI in Entra app registration doesn't match `ENTRA_REDIRECT_URI`, or (for local dev) you're hitting a port that isn't in the SPA redirect URI list.
+    - "Token valid but 401 with `invalid_scope`" → the user's token doesn't carry the `access_as_user` scope. Re-consent, or confirm the token is requested with the right scope.
+    - "`503 Service Unavailable` on requests" → the server couldn't reach Microsoft's JWKS endpoint. Check egress firewall rules for `login.microsoftonline.com`.
 
 **Checklist:**
 - [ ] Write Authentication section in README
-- [ ] Include app registration steps
+- [ ] Include app registration steps (SPA redirect URIs, logout URL, scope, `accessTokenAcceptedVersion`, optional group claims)
+- [ ] Document both `:5173` and `:8025` redirect URIs for local Entra testing (H9)
 - [ ] Include env var table
 - [ ] Include first-API-key walkthrough
-- [ ] Include three troubleshooting items
+- [ ] Include five troubleshooting items (incl. scope failure and 503)
 - [ ] Verify Markdown renders correctly (visual check in editor preview)
 
 ---
@@ -978,19 +1264,19 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 | 3  | Add startup validation + context in `cmd/server/main.go` | Not Started |
 | 4  | Add `ManagedAPIKey` model + migration | Not Started |
 | 5  | Implement managed API key CRUD handlers | Not Started |
-| 6  | Add `managed_keys` mode to Basic-path auth | Not Started |
-| 7  | Rename `BasicAuth` → `APIAuth` with dual-auth Bearer path | Not Started |
-| 8  | Create `EntraRequired` middleware | Not Started |
+| 6  | Add `managed_keys` mode to Basic-path auth (disabled-mode pathway) | Not Started |
+| 7  | Rename `BasicAuth` → `APIAuth` with dual-auth Bearer path + entra-mode Basic override | Not Started |
+| 8  | Create `EntraRequired` middleware (REST + WS variants) | Not Started |
 | 9  | Create WebSocket log-scrubbing middleware | Not Started |
 | 10 | Add `/mock/auth-config` endpoint | Not Started |
-| 11 | Wire auth into `server.New()` | Not Started |
+| 11 | Wire auth into `server.New()` (+ remove unused CORS, move `/mock/health`) | Not Started |
 | 12 | Add `@azure/msal-browser` dependency + `auth/config.ts` | Not Started |
 | 13 | Create MSAL singleton wrapper `auth/msalInstance.ts` | Not Started |
 | 14 | Create `useAuth` composable | Not Started |
 | 15 | Refactor `main.ts` to async bootstrap | Not Started |
 | 16 | Add auth interceptor to `api/client.ts` | Not Started |
-| 17 | Thread token into WebSocket URL | Not Started |
-| 18 | Add sign-in / user display to `App.vue` | Not Started |
+| 17 | Defer WebSocket connect + thread token into URL | Not Started |
+| 18 | Add sign-in / user display / sign-out to `App.vue` | Not Started |
 | 19 | Create `ApiKeysPage.vue` | Not Started |
 | 20 | Register `/api-keys` route + nav link | Not Started |
 | 21 | Update `README.md` with Authentication section | Not Started |
