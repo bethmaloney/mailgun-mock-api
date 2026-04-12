@@ -8,14 +8,12 @@ RUN npm run build
 
 # Stage 2: Build Go binary
 FROM docker.io/golang:1.26-alpine AS backend
-RUN apk add --no-cache gcc musl-dev
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=frontend /app/web/dist internal/server/static/
-ENV CGO_ENABLED=1
-RUN go build -o mailgun-mock-api ./cmd/server
+RUN CGO_ENABLED=0 go build -o mailgun-mock-api ./cmd/server
 
 # Stage 3: Final image
 FROM docker.io/alpine:3.21

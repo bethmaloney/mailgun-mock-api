@@ -16,7 +16,7 @@ import (
 
 	"github.com/bethmaloney/mailgun-mock-api/internal/server"
 	"github.com/mailgun/mailgun-go/v5"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 

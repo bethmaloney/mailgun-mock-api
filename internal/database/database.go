@@ -7,7 +7,7 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/config"
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 

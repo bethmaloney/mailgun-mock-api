@@ -13,7 +13,7 @@ import (
 
 	"github.com/bethmaloney/mailgun-mock-api/internal/apikey"
 	"github.com/go-chi/chi/v5"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
