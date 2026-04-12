@@ -648,12 +648,12 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - No tests needed for `main.go` directly; behavior is covered by `config_test.go` + `server_test.go`.
 
 **Checklist:**
-- [ ] Import `context`
-- [ ] Create and cancel top-level context
-- [ ] Call `cfg.Validate()` with fatal on error
-- [ ] Log "auth disabled" warning in disabled mode
-- [ ] Update call site for `server.New` (compiles against Task 11's new signature; do this task AFTER Task 11 or use a temporary `_ = ctx` to keep things compiling in between)
-- [ ] `just build` succeeds
+- [x] Import `context`
+- [x] Create and cancel top-level context
+- [x] Call `cfg.Validate()` with fatal on error
+- [x] Log "auth disabled" warning in disabled mode
+- [x] Update call site for `server.New` (compiles against Task 11's new signature; do this task AFTER Task 11 or use a temporary `_ = ctx` to keep things compiling in between)
+- [x] `just build` succeeds
 
 ---
 
@@ -682,7 +682,7 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - [x] Create `internal/apikey/managed.go` with the model + key-generator helper
 - [x] Add `&apikey.ManagedAPIKey{}` to `AutoMigrate` call in `server.go`
 - [x] `go build ./...` succeeds
-- [ ] Run server locally with `just dev` — confirm new table is created (log check or sqlite inspection)
+- [x] Run server locally with `just dev` — confirm new table is created (log check or sqlite inspection)
 
 ---
 
@@ -1261,9 +1261,9 @@ There are two coupled changes. Do them together — doing either alone leaves th
 |------|-------------|--------|
 | 1  | Extend `config.Config` with Entra fields + `Validate()` | Done |
 | 2  | Create `internal/auth` package with `Validator` | Done |
-| 3  | Add startup validation + context in `cmd/server/main.go` | Not Started |
-| 4  | Add `ManagedAPIKey` model + migration | Not Started |
-| 5  | Implement managed API key CRUD handlers | Not Started |
+| 3  | Add startup validation + context in `cmd/server/main.go` | Done |
+| 4  | Add `ManagedAPIKey` model + migration | Done |
+| 5  | Implement managed API key CRUD handlers | Done |
 | 6  | Add `managed_keys` mode to Basic-path auth (disabled-mode pathway) | Not Started |
 | 7  | Rename `BasicAuth` → `APIAuth` with dual-auth Bearer path + entra-mode Basic override | Not Started |
 | 8  | Create `EntraRequired` middleware (REST + WS variants) | Not Started |
