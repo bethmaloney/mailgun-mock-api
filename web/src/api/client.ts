@@ -4,6 +4,8 @@
  * handles forwarding during development.
  */
 
+import { getAccessToken } from "@/auth/msalInstance";
+
 export interface ApiError {
   message: string;
   status: number;
@@ -22,6 +24,11 @@ class ApiClient {
 
     // Spread options.headers AFTER defaults so callers can override Content-Type
     Object.assign(headers, options.headers as Record<string, string>);
+
+    const token = await getAccessToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
 
     const response = await fetch(url, {
       ...options,

@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from "vue";
+import { getAccessToken } from "@/auth/msalInstance";
 
 export interface WSMessage {
   type: string;
@@ -15,17 +16,23 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
 const maxReconnectDelay = 30000;
 
-function getWSUrl(): string {
+async function getWSUrl(): Promise<string> {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/mock/ws`;
+  const base = `${protocol}//${window.location.host}/mock/ws`;
+  const token = await getAccessToken();
+  if (token) {
+    return `${base}?access_token=${encodeURIComponent(token)}`;
+  }
+  return base;
 }
 
-function connect() {
+async function connect() {
   if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
     return;
   }
 
-  socket = new WebSocket(getWSUrl());
+  const url = await getWSUrl();
+  socket = new WebSocket(url);
 
   socket.onopen = () => {
     connected.value = true;
@@ -59,12 +66,15 @@ function scheduleReconnect() {
   reconnectAttempts++;
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
-    connect();
+    connect().catch(() => {
+      // Will retry on next scheduled reconnect
+    });
   }, delay);
 }
 
-// Initialize connection on first import
-connect();
+export function startWebSocket() {
+  connect();
+}
 
 export function useWebSocket() {
   function onMessage(handler: MessageHandler) {

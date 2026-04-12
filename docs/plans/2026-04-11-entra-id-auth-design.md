@@ -1033,8 +1033,8 @@ This is the only server-level auth-enabled test; unit tests in Task 2 / Task 7 /
 - **Manual smoke at end of this task:** run `just dev` with `AUTH_MODE=disabled`, confirm the UI loads exactly as before. (Entra-on smoke waits for Task 21 doc task since it requires env vars + app registration.)
 
 **Checklist:**
-- [ ] Refactor `main.ts` to async bootstrap
-- [ ] `npm run build` succeeds
+- [x] Refactor `main.ts` to async bootstrap
+- [x] `npm run build` succeeds
 - [ ] Manual smoke: `just dev` (auth disabled) — UI loads and dashboard renders
 
 ---
@@ -1052,9 +1052,9 @@ This is the only server-level auth-enabled test; unit tests in Task 2 / Task 7 /
 - No new tests — covered end-to-end by Task 23 and the existing Playwright suite (run in auth-off mode).
 
 **Checklist:**
-- [ ] Add pre-flight token fetch to `request<T>()`
-- [ ] `npm run lint` passes
-- [ ] `npm run build` succeeds
+- [x] Add pre-flight token fetch to `request<T>()`
+- [x] `npm run lint` passes
+- [x] `npm run build` succeeds
 - [ ] Manual smoke: `just dev`, click through several pages, confirm API calls still succeed (network tab shows no Authorization header in disabled mode)
 
 ---
@@ -1098,14 +1098,14 @@ There are two coupled changes. Do them together — doing either alone leaves th
 3. **Call `startWebSocket()` from `main.ts`.** At the end of `bootstrap()`, after auth is ready (in both branches — disabled and entra), call `startWebSocket()` before `createApp(...).mount(...)`. Task 15's bootstrap flow already has the branching; add `startWebSocket()` to both arms.
 
 **Checklist:**
-- [ ] Delete the module-level `connect()` call in `useWebSocket.ts`
-- [ ] Export `startWebSocket()` wrapping `connect()`
-- [ ] Make `getWSUrl` async; await `getAccessToken`; append `?access_token=...` when present
-- [ ] Make `connect()` async; await `getWSUrl()` before opening the socket
-- [ ] Verify reconnection path still works (re-runs `getWSUrl` → fresh token)
-- [ ] Call `startWebSocket()` from both arms of `main.ts`'s `bootstrap()`
-- [ ] `npm run lint` passes
-- [ ] `npm run build` succeeds
+- [x] Delete the module-level `connect()` call in `useWebSocket.ts`
+- [x] Export `startWebSocket()` wrapping `connect()`
+- [x] Make `getWSUrl` async; await `getAccessToken`; append `?access_token=...` when present
+- [x] Make `connect()` async; await `getWSUrl()` before opening the socket
+- [x] Verify reconnection path still works (re-runs `getWSUrl` → fresh token)
+- [x] Call `startWebSocket()` from both arms of `main.ts`'s `bootstrap()`
+- [x] `npm run lint` passes
+- [x] `npm run build` succeeds
 - [ ] Manual smoke (disabled mode): `just dev`, open browser, confirm "Connected" indicator appears and the WS URL in DevTools has no `access_token` param
 - [ ] Manual smoke (entra mode, once Task 21 is done): confirm the WS URL in DevTools has a `?access_token=<jwt>` param and "Connected" appears only after sign-in completes
 
@@ -1268,14 +1268,14 @@ There are two coupled changes. Do them together — doing either alone leaves th
 | 7  | Rename `BasicAuth` → `APIAuth` with dual-auth Bearer path + entra-mode Basic override | Done |
 | 8  | Create `EntraRequired` middleware (REST + WS variants) | Done |
 | 9  | Create WebSocket log-scrubbing middleware | Done |
-| 10 | Add `/mock/auth-config` endpoint | Not Started |
-| 11 | Wire auth into `server.New()` (+ remove unused CORS, move `/mock/health`) | Not Started |
-| 12 | Add `@azure/msal-browser` dependency + `auth/config.ts` | Not Started |
-| 13 | Create MSAL singleton wrapper `auth/msalInstance.ts` | Not Started |
-| 14 | Create `useAuth` composable | Not Started |
-| 15 | Refactor `main.ts` to async bootstrap | Not Started |
-| 16 | Add auth interceptor to `api/client.ts` | Not Started |
-| 17 | Defer WebSocket connect + thread token into URL | Not Started |
+| 10 | Add `/mock/auth-config` endpoint | Done |
+| 11 | Wire auth into `server.New()` (+ remove unused CORS, move `/mock/health`) | Done |
+| 12 | Add `@azure/msal-browser` dependency + `auth/config.ts` | Done |
+| 13 | Create MSAL singleton wrapper `auth/msalInstance.ts` | Done |
+| 14 | Create `useAuth` composable | Done |
+| 15 | Refactor `main.ts` to async bootstrap | Done |
+| 16 | Add auth interceptor to `api/client.ts` | Done |
+| 17 | Defer WebSocket connect + thread token into URL | Done |
 | 18 | Add sign-in / user display / sign-out to `App.vue` | Not Started |
 | 19 | Create `ApiKeysPage.vue` | Not Started |
 | 20 | Register `/api-keys` route + nav link | Not Started |
