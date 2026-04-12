@@ -3,7 +3,8 @@ import { test, expect } from "./fixtures";
 const DOMAIN = "suppress-test.example.com";
 
 test.describe("Suppressions Page", () => {
-  test("domain selector required — table not shown until domain selected", async ({ page }) => {
+  test("domain selector required — table not shown until domain selected", async ({ page, api: _api }) => {
+    // _api triggers the fixture's reset() so this test sees an empty DB.
     // No domains created — navigate to page
     await page.goto("/suppressions");
     await expect(page.getByRole("heading", { name: "Suppressions" })).toBeVisible();

@@ -4,7 +4,8 @@ const DOMAIN = "trigger-e2e.example.com";
 
 test.describe("Trigger Events Page", () => {
   // 1. 3-step workflow visibility — only domain selector visible initially
-  test("only domain selector visible initially when no domains", async ({ page }) => {
+  test("only domain selector visible initially when no domains", async ({ page, api: _api }) => {
+    // _api triggers the fixture's reset() so this test sees an empty DB.
     await page.goto("/trigger-events");
     await expect(page.locator("main h1")).toHaveText("Trigger Events");
 

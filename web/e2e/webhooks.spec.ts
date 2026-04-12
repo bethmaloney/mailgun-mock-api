@@ -3,7 +3,8 @@ import { test, expect } from "./fixtures";
 const DOMAIN = "webhook-test.example.com";
 
 test.describe("Webhooks", () => {
-  test("shows empty state — no webhooks configured, no delivery log", async ({ page }) => {
+  test("shows empty state — no webhooks configured, no delivery log", async ({ page, api: _api }) => {
+    // _api triggers the fixture's reset() so this test sees an empty DB.
     await page.goto("/webhooks");
     await expect(page.getByRole("heading", { name: "Webhooks" })).toBeVisible();
 

@@ -4,7 +4,8 @@ const DOMAIN = "tpl-e2e.example.com";
 
 test.describe("Templates Page", () => {
   // 1. Shows empty state — no templates for selected domain
-  test("shows empty state when no domains exist", async ({ page }) => {
+  test("shows empty state when no domains exist", async ({ page, api: _api }) => {
+    // _api triggers the fixture's reset() so this test sees an empty DB.
     await page.goto("/templates");
     await expect(page.locator("main h1")).toHaveText("Templates");
 

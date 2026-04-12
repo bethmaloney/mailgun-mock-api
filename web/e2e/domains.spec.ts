@@ -25,7 +25,8 @@ test.describe("Domains CRUD", () => {
     await expect(page.getByText("second.example.com")).toBeVisible();
   });
 
-  test("create domain via UI form", async ({ page }) => {
+  test("create domain via UI form", async ({ page, api: _api }) => {
+    // _api triggers the fixture's reset() so this test sees an empty DB.
     await page.goto("/domains");
 
     await page.getByPlaceholder("Enter domain name").fill("ui-created.example.com");
