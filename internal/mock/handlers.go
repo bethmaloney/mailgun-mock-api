@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bethmaloney/mailgun-mock-api/internal/config"
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
 	ws "github.com/bethmaloney/mailgun-mock-api/internal/websocket"
 	"github.com/go-chi/chi/v5"
@@ -95,6 +96,7 @@ type Handlers struct {
 	db     *gorm.DB
 	config MockConfig
 	hub    *ws.Hub
+	cfg    *config.Config
 }
 
 // SetHub sets the WebSocket hub used for broadcasting events.
@@ -103,10 +105,14 @@ func (h *Handlers) SetHub(hub *ws.Hub) {
 }
 
 // NewHandlers creates a new Handlers instance with default configuration.
-func NewHandlers(db *gorm.DB) *Handlers {
+func NewHandlers(db *gorm.DB, cfg *config.Config) *Handlers {
+	if cfg == nil {
+		cfg = &config.Config{AuthMode: "disabled"}
+	}
 	return &Handlers{
 		db:     db,
 		config: defaultConfig(),
+		cfg:    cfg,
 	}
 }
 

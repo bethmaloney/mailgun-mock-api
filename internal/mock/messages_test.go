@@ -218,7 +218,7 @@ func createTestAttachment(t *testing.T, db *gorm.DB, storedMessageID, filename, 
 
 func TestListMessages_EmptyDatabase(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	rec := doRequest(t, router, http.MethodGet, "/mock/messages")
@@ -253,7 +253,7 @@ func TestListMessages_EmptyDatabase(t *testing.T) {
 
 func TestListMessages_OrderedByCreationTimeDesc(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	now := time.Now()
@@ -301,7 +301,7 @@ func TestListMessages_OrderedByCreationTimeDesc(t *testing.T) {
 
 func TestListMessages_FilterByDomain(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "msg1@example.com", "a@example.com", "b@example.com", "Example msg", "[]")
@@ -340,7 +340,7 @@ func TestListMessages_FilterByDomain(t *testing.T) {
 
 func TestListMessages_FilterByFrom(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "msg1@example.com", "Alice <alice@example.com>", "b@example.com", "From Alice", "[]")
@@ -368,7 +368,7 @@ func TestListMessages_FilterByFrom(t *testing.T) {
 
 func TestListMessages_FilterByTo(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "msg1@example.com", "a@example.com", "recipient@test.com", "To test.com", "[]")
@@ -396,7 +396,7 @@ func TestListMessages_FilterByTo(t *testing.T) {
 
 func TestListMessages_FilterBySubject(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "msg1@example.com", "a@example.com", "b@example.com", "Welcome to our platform", "[]")
@@ -424,7 +424,7 @@ func TestListMessages_FilterBySubject(t *testing.T) {
 
 func TestListMessages_FilterByTag(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "msg1@example.com", "a@example.com", "b@example.com", "Tagged welcome", `["welcome","onboarding"]`)
@@ -452,7 +452,7 @@ func TestListMessages_FilterByTag(t *testing.T) {
 
 func TestListMessages_FilterByTimeRange(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	now := time.Now()
@@ -492,7 +492,7 @@ func TestListMessages_FilterByTimeRange(t *testing.T) {
 
 func TestListMessages_LimitParameter(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	// Create 5 messages
@@ -548,7 +548,7 @@ func TestListMessages_LimitParameter(t *testing.T) {
 
 func TestListMessages_Pagination(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	// Create 5 messages
@@ -595,7 +595,7 @@ func TestListMessages_Pagination(t *testing.T) {
 
 func TestListMessages_StatusFromMostRecentEvent(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	now := float64(time.Now().UnixMicro()) / 1e6
@@ -630,7 +630,7 @@ func TestListMessages_StatusFromMostRecentEvent(t *testing.T) {
 
 func TestListMessages_HasAttachmentsField(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	// Message with attachment
@@ -685,7 +685,7 @@ func TestListMessages_HasAttachmentsField(t *testing.T) {
 
 func TestListMessages_ToFieldIsArray(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "multi-to@example.com", "a@example.com", "alice@test.com, bob@test.com", "Multiple recipients", "[]")
@@ -721,7 +721,7 @@ func TestListMessages_ToFieldIsArray(t *testing.T) {
 
 func TestListMessages_TagsFieldIsArray(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "tagged-msg@example.com", "a@example.com", "b@example.com", "Tagged", `["welcome","onboarding"]`)
@@ -761,7 +761,7 @@ func TestListMessages_TagsFieldIsArray(t *testing.T) {
 
 func TestGetMessageDetail_NotFound(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	rec := doRequest(t, router, http.MethodGet, "/mock/messages/nonexistent-key")
@@ -779,7 +779,7 @@ func TestGetMessageDetail_NotFound(t *testing.T) {
 
 func TestGetMessageDetail_ReturnsFullDetail(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	msg := message.StoredMessage{
@@ -869,7 +869,7 @@ func TestGetMessageDetail_ReturnsFullDetail(t *testing.T) {
 
 func TestGetMessageDetail_IncludesEvents(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	now := float64(time.Now().UnixMicro()) / 1e6
@@ -932,7 +932,7 @@ func TestGetMessageDetail_IncludesEvents(t *testing.T) {
 
 func TestGetMessageDetail_IncludesAttachments(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	msg := createTestMessage(t, db, "example.com", "att-detail@example.com", "a@example.com", "b@example.com", "Attachment detail", "[]")
@@ -983,7 +983,7 @@ func TestGetMessageDetail_IncludesAttachments(t *testing.T) {
 
 func TestGetMessageDetail_ParsesJSONFields(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	msg := message.StoredMessage{
@@ -1071,7 +1071,7 @@ func TestGetMessageDetail_ParsesJSONFields(t *testing.T) {
 
 func TestDeleteSingleMessage_NotFound(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	rec := doRequest(t, router, http.MethodDelete, "/mock/messages/nonexistent-key")
@@ -1089,7 +1089,7 @@ func TestDeleteSingleMessage_NotFound(t *testing.T) {
 
 func TestDeleteSingleMessage_Success(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "delete-me@example.com", "a@example.com", "b@example.com", "Delete me", "[]")
@@ -1116,7 +1116,7 @@ func TestDeleteSingleMessage_Success(t *testing.T) {
 
 func TestDeleteSingleMessage_NotInListAfterDeletion(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "keep-me@example.com", "a@example.com", "b@example.com", "Keep me", "[]")
@@ -1164,7 +1164,7 @@ func TestDeleteSingleMessage_NotInListAfterDeletion(t *testing.T) {
 
 func TestClearAllMessages_ClearsMessages(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	// Create several messages
@@ -1211,7 +1211,7 @@ func TestClearAllMessages_ClearsMessages(t *testing.T) {
 
 func TestClearAllMessages_ClearsEvents(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	now := float64(time.Now().UnixMicro()) / 1e6
@@ -1249,7 +1249,7 @@ func TestClearAllMessages_ClearsEvents(t *testing.T) {
 
 func TestClearAllMessages_ListReturnsEmpty(t *testing.T) {
 	db := setupMessagesDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupMessagesRouter(h)
 
 	createTestMessage(t, db, "example.com", "pre-clear@example.com", "a@example.com", "b@example.com", "Pre-clear", "[]")

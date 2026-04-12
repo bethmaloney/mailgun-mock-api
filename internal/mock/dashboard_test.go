@@ -126,7 +126,7 @@ func decodeDashboard(t *testing.T, rec *httptest.ResponseRecorder) dashboardResp
 
 func TestGetDashboard_EmptyDatabase(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	rec := getDashboard(t, router)
@@ -210,7 +210,7 @@ func TestGetDashboard_EmptyDatabase(t *testing.T) {
 
 func TestGetDashboard_WithMessages(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	now := time.Now()
@@ -266,7 +266,7 @@ func TestGetDashboard_WithMessages(t *testing.T) {
 
 func TestGetDashboard_WithEvents(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	now := float64(time.Now().UnixMicro()) / 1e6
@@ -348,7 +348,7 @@ func TestGetDashboard_WithEvents(t *testing.T) {
 
 func TestGetDashboard_WithDomains(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	// Create 3 domains: 2 active, 1 unverified.
@@ -396,7 +396,7 @@ func TestGetDashboard_WithDomains(t *testing.T) {
 
 func TestGetDashboard_WithWebhookDeliveries(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	// Create some domain webhooks (4 unique domain+event_type combos => configured=4).
@@ -481,7 +481,7 @@ func TestGetDashboard_WithWebhookDeliveries(t *testing.T) {
 
 func TestGetDashboard_CombinedData(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	now := time.Now()
@@ -628,7 +628,7 @@ func TestGetDashboard_CombinedData(t *testing.T) {
 
 func TestGetDashboard_ResponseStructure(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	rec := getDashboard(t, router)
@@ -726,7 +726,7 @@ func keys(m map[string]json.RawMessage) []string {
 
 func TestGetDashboard_DisabledDomainsCountedInTotal(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	// Create domains with mixed states including "disabled".
@@ -774,7 +774,7 @@ func TestGetDashboard_DisabledDomainsCountedInTotal(t *testing.T) {
 
 func TestGetDashboard_WebhookConfiguredCountsAccountWebhooks(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	// Create domain webhooks.
@@ -821,7 +821,7 @@ func TestGetDashboard_WebhookConfiguredCountsAccountWebhooks(t *testing.T) {
 
 func TestGetDashboard_WebhookDeliveryFields(t *testing.T) {
 	db := setupDashboardDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupDashboardRouter(h)
 
 	// Create a single webhook delivery with known values.

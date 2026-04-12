@@ -79,7 +79,7 @@ func TestHealthHandler(t *testing.T) {
 
 func TestGetConfig_DefaultValues(t *testing.T) {
 	db := setupTestDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/mock/config", nil)
@@ -229,7 +229,7 @@ func TestGetConfig_DefaultValues(t *testing.T) {
 
 func TestUpdateConfig_PartialUpdate(t *testing.T) {
 	db := setupTestDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupRouter(h)
 
 	t.Run("partial update changes only specified fields", func(t *testing.T) {
@@ -360,7 +360,7 @@ func TestUpdateConfig_PartialUpdate(t *testing.T) {
 
 func TestUpdateConfig_InvalidJSON(t *testing.T) {
 	db := setupTestDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupRouter(h)
 
 	t.Run("returns 400 for malformed JSON", func(t *testing.T) {
@@ -397,7 +397,7 @@ func TestUpdateConfig_InvalidJSON(t *testing.T) {
 
 func TestGetConfig_AfterUpdate(t *testing.T) {
 	db := setupTestDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupRouter(h)
 
 	// First, update a config value
@@ -448,7 +448,7 @@ func TestGetConfig_AfterUpdate(t *testing.T) {
 
 func TestGetConfig_JSONStructure(t *testing.T) {
 	db := setupTestDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/mock/config", nil)
@@ -547,7 +547,7 @@ func TestGetConfig_JSONStructure(t *testing.T) {
 
 func TestResetAll(t *testing.T) {
 	db := setupTestDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupRouter(h)
 
 	req := httptest.NewRequest(http.MethodPost, "/mock/reset", nil)
@@ -581,7 +581,7 @@ func TestResetAll(t *testing.T) {
 
 func TestResetDomain(t *testing.T) {
 	db := setupTestDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupRouter(h)
 
 	t.Run("returns success message with domain name", func(t *testing.T) {
@@ -636,7 +636,7 @@ func TestResetDomain(t *testing.T) {
 
 func TestResetMessages(t *testing.T) {
 	db := setupTestDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupRouter(h)
 
 	req := httptest.NewRequest(http.MethodPost, "/mock/reset/messages", nil)
@@ -674,7 +674,7 @@ func TestResetMessages(t *testing.T) {
 
 func TestResetAll_ResetsConfig(t *testing.T) {
 	db := setupTestDB(t)
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 	router := setupRouter(h)
 
 	// First, update the config

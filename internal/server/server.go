@@ -64,7 +64,7 @@ func New(db *gorm.DB) http.Handler {
 	go hub.Run()
 
 	// Mock management routes
-	h := mock.NewHandlers(db)
+	h := mock.NewHandlers(db, nil)
 
 	// Domain API routes
 	dh := domain.NewHandlers(db, h.Config())

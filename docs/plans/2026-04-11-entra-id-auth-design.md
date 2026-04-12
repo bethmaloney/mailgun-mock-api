@@ -846,11 +846,11 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - Test: `TestGetAuthConfig_Disabled`, `TestGetAuthConfig_Enabled` (write a test file if one doesn't exist for `mock`).
 
 **Checklist:**
-- [ ] Thread `*config.Config` into `mock.Handlers` (signature change)
-- [ ] Add `GetAuthConfig` handler
-- [ ] Add tests
-- [ ] `go test ./internal/mock/...` passes
-- [ ] `go build ./...` passes
+- [x] Thread `*config.Config` into `mock.Handlers` (signature change)
+- [x] Add `GetAuthConfig` handler
+- [x] Add tests
+- [x] `go test ./internal/mock/...` passes
+- [x] `go build ./...` passes
 
 ---
 
