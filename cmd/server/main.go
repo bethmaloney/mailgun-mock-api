@@ -6,10 +6,16 @@ import (
 
 	"github.com/bethmaloney/mailgun-mock-api/internal/config"
 	"github.com/bethmaloney/mailgun-mock-api/internal/database"
+	"github.com/bethmaloney/mailgun-mock-api/internal/logging"
 	"github.com/bethmaloney/mailgun-mock-api/internal/server"
 )
 
 func main() {
+	// Route slog + the legacy log package through an async handler so
+	// no caller can block on a slow stderr pipe. Must run before any
+	// HTTP traffic starts. See internal/logging for the rationale.
+	logging.Init()
+
 	cfg := config.Load()
 
 	db, err := database.Connect(cfg)
