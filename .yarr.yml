@@ -1,0 +1,24 @@
+# .yarr.yml — Yarr defaults for this repo
+
+createBranch: false
+env:
+  IS_SANDBOX: '1'
+checks:
+- name: lint
+  command: just lint
+  when: each_iteration
+  timeoutSecs: 300
+  maxRetries: 1
+- name: test
+  command: just test
+  when: each_iteration
+  timeoutSecs: 300
+  maxRetries: 1
+- name: e2e test
+  command: just test-e2e
+  when: post_completion
+  timeoutSecs: 300
+  maxRetries: 1
+gitSync:
+  enabled: true
+  maxPushRetries: 3

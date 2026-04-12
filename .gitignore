@@ -27,3 +27,6 @@ internal/server/static/
 web/e2e/.server.pid
 web/test-results/
 web/playwright-report/
+
+# Claude Code local state
+.claude/
