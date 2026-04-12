@@ -1248,10 +1248,10 @@ There are two coupled changes. Do them together — doing either alone leaves th
 - Use `test.beforeEach` to clear the `managed_api_keys` table via the existing reset helpers in `fixtures.ts` (or add one if needed — but prefer using the API helper to DELETE all existing keys via the new endpoint).
 
 **Checklist:**
-- [ ] Create `api-keys.spec.ts` with 5 specs
-- [ ] Ensure beforeEach clears state
-- [ ] `npx playwright test api-keys.spec.ts` passes
-- [ ] Full suite still passes: `just lint && go test ./... && cd web && npx playwright test`
+- [x] Create `api-keys.spec.ts` with 5 specs
+- [x] Ensure beforeEach clears state
+- [x] `npx playwright test api-keys.spec.ts` passes
+- [x] Full suite still passes: `just lint && go test ./... && cd web && npx playwright test`
 
 ---
 

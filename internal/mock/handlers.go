@@ -217,6 +217,7 @@ var resetTables = []string{
 	"account_webhooks",
 	"routes",
 	"api_keys",
+	"managed_api_keys",
 	"ip_allowlist_entries",
 	"ips",
 	"ip_pools",
