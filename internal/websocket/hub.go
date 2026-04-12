@@ -30,13 +30,31 @@ type Hub struct {
 	clients    map[*Client]bool
 }
 
+// broadcastBufferSize bounds the number of pending broadcasts. HTTP handlers
+// publish via Publish(), which drops on full rather than blocking, so this
+// size only needs to absorb normal bursts — not unlimited traffic.
+const broadcastBufferSize = 256
+
 // NewHub creates a new Hub instance.
 func NewHub() *Hub {
 	return &Hub{
-		Broadcast:  make(chan BroadcastMessage),
+		Broadcast:  make(chan BroadcastMessage, broadcastBufferSize),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
+	}
+}
+
+// Publish sends a broadcast message without blocking the caller.
+// If the broadcast queue is full (e.g. Hub.Run is stalled or overwhelmed),
+// the message is dropped and logged. HTTP handlers MUST use Publish rather
+// than sending to Broadcast directly, so that WebSocket plumbing can never
+// wedge an API request.
+func (h *Hub) Publish(msg BroadcastMessage) {
+	select {
+	case h.Broadcast <- msg:
+	default:
+		log.Printf("websocket: broadcast queue full, dropping %s", msg.Type)
 	}
 }
 
