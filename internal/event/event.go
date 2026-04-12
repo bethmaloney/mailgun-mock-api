@@ -114,10 +114,10 @@ func NewHandlers(db *gorm.DB, config *mock.MockConfig) *Handlers {
 // broadcastEventNew sends an event.new WebSocket message if a hub is configured.
 func (h *Handlers) broadcastEventNew(domainName, eventType string) {
 	if h.hub != nil {
-		h.hub.Publish(ws.BroadcastMessage{
+		h.hub.Broadcast <- ws.BroadcastMessage{
 			Type: "event.new",
 			Data: map[string]string{"domain": domainName, "event": eventType},
-		})
+		}
 	}
 }
 

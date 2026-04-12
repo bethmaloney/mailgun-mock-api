@@ -234,7 +234,7 @@ func (h *Handlers) ResetAll(w http.ResponseWriter, r *http.Request) {
 	h.config = defaultConfig()
 	response.RespondSuccess(w, "All data has been reset")
 	if h.hub != nil {
-		h.hub.Publish(ws.BroadcastMessage{Type: "data.reset", Data: nil})
+		h.hub.Broadcast <- ws.BroadcastMessage{Type: "data.reset", Data: nil}
 	}
 }
 

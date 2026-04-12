@@ -361,10 +361,10 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.hub != nil {
-		h.hub.Publish(ws.BroadcastMessage{
+		h.hub.Broadcast <- ws.BroadcastMessage{
 			Type: "message.new",
 			Data: map[string]string{"id": messageID, "domain": domainName},
-		})
+		}
 	}
 
 	response.RespondJSON(w, http.StatusOK, map[string]string{

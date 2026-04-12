@@ -9,7 +9,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 // BaseModel is a replacement for gorm.Model that uses a string UUID as the primary key.
@@ -40,16 +39,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("unsupported database driver: %s", cfg.DBDriver)
 	}
 
-	// Silence GORM's default logger. It uses stderr with blocking writes and
-	// logs every ErrRecordNotFound as a warning — which is normal lookup
-	// behavior here, not an error. Under e2e load the 64 KB stderr pipe
-	// buffer fills, `os.File.Write` blocks inside the kernel write syscall
-	// while holding the fd-mutex, and every subsequent HTTP handler that
-	// touches the DB wedges waiting for the same lock. This deadlocked the
-	// full Playwright suite reliably at ~40-80 requests.
-	db, err := gorm.Open(dialector, &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
+	db, err := gorm.Open(dialector, &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
