@@ -1124,11 +1124,11 @@ There are two coupled changes. Do them together — doing either alone leaves th
 - **Sign-out behavior (H8).** `signOut` resolves to Task 13's `logoutRedirect`-backed function. Clicking it triggers a full-page navigation to Entra's logout endpoint, which invalidates the tenant session and then redirects the browser to `window.location.origin`. `main.ts`'s bootstrap re-runs on arrival, and because the Entra session is gone, `loginRedirect` fires and the user lands on the Microsoft sign-in page. This is intentional — "sign out" must mean "gone until you re-authenticate," not "local cache cleared while tenant still trusts you."
 
 **Checklist:**
-- [ ] Import and use `useAuth`
-- [ ] Add conditional user block in sidebar header
+- [x] Import and use `useAuth`
+- [x] Add conditional user block in sidebar header
 - [ ] Verify click-to-signout triggers Entra logout (not just local cache clear) — manual smoke once Task 21 lands
-- [ ] `npm run lint` passes
-- [ ] `npm run build` succeeds
+- [x] `npm run lint` passes
+- [x] `npm run build` succeeds
 
 ---
 
@@ -1276,7 +1276,7 @@ There are two coupled changes. Do them together — doing either alone leaves th
 | 15 | Refactor `main.ts` to async bootstrap | Done |
 | 16 | Add auth interceptor to `api/client.ts` | Done |
 | 17 | Defer WebSocket connect + thread token into URL | Done |
-| 18 | Add sign-in / user display / sign-out to `App.vue` | Not Started |
+| 18 | Add sign-in / user display / sign-out to `App.vue` | Done |
 | 19 | Create `ApiKeysPage.vue` | Not Started |
 | 20 | Register `/api-keys` route + nav link | Not Started |
 | 21 | Update `README.md` with Authentication section | Not Started |

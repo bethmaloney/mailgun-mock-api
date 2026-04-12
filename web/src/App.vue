@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import ToastNotification from "@/components/ToastNotification.vue";
+import { useAuth } from "@/composables/useAuth";
 import { useWebSocket } from "@/composables/useWebSocket";
 
 const { connected } = useWebSocket();
+const { user, isAuthenticated, signOut } = useAuth();
 </script>
 
 <template>
@@ -18,6 +20,18 @@ const { connected } = useWebSocket();
         >
           <span class="status-dot" />
           <span class="status-text">{{ connected ? 'Connected' : 'Disconnected' }}</span>
+        </div>
+        <div
+          v-if="isAuthenticated"
+          class="sidebar-user"
+        >
+          <span class="sidebar-user-name">{{ user?.name || user?.email || 'User' }}</span>
+          <button
+            class="sidebar-sign-out"
+            @click="signOut()"
+          >
+            Sign out
+          </button>
         </div>
       </div>
       <nav class="sidebar-nav">
@@ -296,5 +310,39 @@ body {
 .status-text {
   font-size: 0.6875rem;
   color: var(--sidebar-section-text);
+}
+
+/* -------------------------------------------------------
+   Sidebar user block
+   ------------------------------------------------------- */
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.5rem;
+  gap: 0.5rem;
+}
+
+.sidebar-user-name {
+  font-size: 0.75rem;
+  color: var(--sidebar-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-sign-out {
+  background: none;
+  border: none;
+  color: var(--sidebar-section-text);
+  font-size: 0.6875rem;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.sidebar-sign-out:hover {
+  color: var(--sidebar-text-active);
 }
 </style>
