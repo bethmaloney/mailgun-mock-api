@@ -35,7 +35,13 @@ var staticFiles embed.FS
 func New(db *gorm.DB) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)
+	// NOTE: chi's middleware.Logger is deliberately omitted. It writes every
+	// request to os.Stderr via the default log.Logger, which blocks inside
+	// the kernel write syscall once the stderr pipe buffer fills (64 KB on
+	// Linux) — wedging every subsequent HTTP handler. This reliably
+	// deadlocked the Playwright e2e suite at ~320 requests. If you want
+	// request logging, add it back with a non-blocking writer (async
+	// goroutine + bounded channel, or an on-disk file).
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
