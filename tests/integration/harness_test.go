@@ -33,7 +33,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	handler := server.New(db)
+	handler := server.New(context.Background(), db, nil, nil)
 	testServer = httptest.NewServer(handler)
 	baseURL = testServer.URL
 

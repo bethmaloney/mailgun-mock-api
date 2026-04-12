@@ -1,13 +1,16 @@
 package server
 
 import (
+	"context"
 	"embed"
 	"io/fs"
 	"net/http"
+	"time"
 
-	"github.com/bethmaloney/mailgun-mock-api/internal/auth"
 	"github.com/bethmaloney/mailgun-mock-api/internal/allowlist"
 	"github.com/bethmaloney/mailgun-mock-api/internal/apikey"
+	"github.com/bethmaloney/mailgun-mock-api/internal/auth"
+	"github.com/bethmaloney/mailgun-mock-api/internal/config"
 	"github.com/bethmaloney/mailgun-mock-api/internal/credential"
 	"github.com/bethmaloney/mailgun-mock-api/internal/domain"
 	"github.com/bethmaloney/mailgun-mock-api/internal/event"
@@ -15,6 +18,8 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/mailinglist"
 	"github.com/bethmaloney/mailgun-mock-api/internal/message"
 	"github.com/bethmaloney/mailgun-mock-api/internal/metrics"
+	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
+	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/bethmaloney/mailgun-mock-api/internal/route"
 	"github.com/bethmaloney/mailgun-mock-api/internal/subaccount"
 	"github.com/bethmaloney/mailgun-mock-api/internal/suppression"
@@ -22,31 +27,21 @@ import (
 	"github.com/bethmaloney/mailgun-mock-api/internal/template"
 	"github.com/bethmaloney/mailgun-mock-api/internal/webhook"
 	ws "github.com/bethmaloney/mailgun-mock-api/internal/websocket"
-	appMiddleware "github.com/bethmaloney/mailgun-mock-api/internal/middleware"
-	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	"gorm.io/gorm"
 )
 
 //go:embed all:static
 var staticFiles embed.FS
 
-func New(db *gorm.DB) http.Handler {
-	var validator *auth.Validator // nil until Entra ID is configured (Task 11)
+func New(ctx context.Context, db *gorm.DB, cfg *config.Config, v *auth.Validator) http.Handler {
+	validator := v
 
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
 
 	// Run model migrations.
 	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &apikey.ManagedAPIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &message.Attachment{}, &event.Event{},
@@ -64,7 +59,7 @@ func New(db *gorm.DB) http.Handler {
 	go hub.Run()
 
 	// Mock management routes
-	h := mock.NewHandlers(db, nil)
+	h := mock.NewHandlers(db, cfg)
 
 	// Domain API routes
 	dh := domain.NewHandlers(db, h.Config())
@@ -409,12 +404,35 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/{pool_id}", iph.DeletePool)
 	})
 
+	// Managed API key handlers (init clears existing data — must be outside route group)
+	mkh := apikey.NewManagedHandlers(db)
+
 	// Mailgun API routes (placeholder)
 	r.Route("/api/v3", func(r chi.Router) {
 	})
+
+	// Unauthenticated mock routes — registered before the /mock group so they
+	// do not inherit the EntraRequired middleware.
+	r.Get("/mock/health", mock.HealthHandler)
+	r.Get("/mock/auth-config", h.GetAuthConfig)
+
 	r.Route("/mock", func(r chi.Router) {
-		r.Get("/ws", hub.HandleWebSocket)
-		r.Get("/health", mock.HealthHandler)
+		r.Use(appMiddleware.EntraRequired(validator))
+
+		// WebSocket route with log scrubber and optional reauth timeout
+		if validator != nil {
+			r.With(appMiddleware.WSLogScrubber()).Get("/ws", func(w http.ResponseWriter, req *http.Request) {
+				hub.HandleWebSocketWithTimeout(w, req, 30*time.Minute)
+			})
+		} else {
+			r.With(appMiddleware.WSLogScrubber()).Get("/ws", hub.HandleWebSocket)
+		}
+
+		// Managed API key routes
+		r.Get("/api-keys", mkh.List)
+		r.Post("/api-keys", mkh.Create)
+		r.Delete("/api-keys/{id}", mkh.Delete)
+
 		r.Get("/config", h.GetConfig)
 		r.Put("/config", h.UpdateConfig)
 		r.Get("/dashboard", h.GetDashboard)

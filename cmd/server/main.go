@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/bethmaloney/mailgun-mock-api/internal/auth"
 	"github.com/bethmaloney/mailgun-mock-api/internal/config"
 	"github.com/bethmaloney/mailgun-mock-api/internal/database"
 	"github.com/bethmaloney/mailgun-mock-api/internal/server"
@@ -29,9 +30,16 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// TODO(task-11): pass ctx to server.New when signature changes
-	_ = ctx
-	handler := server.New(db)
+	var validator *auth.Validator
+	if cfg.AuthMode == "entra" {
+		var err error
+		validator, err = auth.NewValidator(ctx, cfg.EntraTenantID, "api://"+cfg.EntraClientID, cfg.EntraAPIScope)
+		if err != nil {
+			log.Fatalf("Failed to initialize auth validator: %v", err)
+		}
+	}
+
+	handler := server.New(ctx, db, cfg, validator)
 
 	log.Printf("Starting server on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {

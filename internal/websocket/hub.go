@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	gorilla "github.com/gorilla/websocket"
 )
@@ -99,6 +100,43 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	go client.writePump()
 	go client.readPump()
+}
+
+// HandleWebSocketWithTimeout is like HandleWebSocket but arms a timer that
+// closes the connection after the given duration, forcing the client to
+// re-authenticate. The timer is cancelled if the client disconnects normally.
+func (h *Hub) HandleWebSocketWithTimeout(w http.ResponseWriter, r *http.Request, timeout time.Duration) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("websocket: upgrade error: %v", err)
+		return
+	}
+
+	client := &Client{
+		Hub:  h,
+		Conn: conn,
+		Send: make(chan []byte, 256),
+		done: make(chan struct{}),
+	}
+
+	h.Register <- client
+
+	// Arm reauth timer — closes the underlying connection after timeout.
+	// We call conn.Close() directly (safe for concurrent use) rather than
+	// conn.WriteMessage (which races with writePump). The close causes both
+	// pumps to exit cleanly.
+	timer := time.AfterFunc(timeout, func() {
+		conn.Close()
+	})
+
+	go client.writePump()
+	go client.readPump()
+
+	// Cancel timer if client disconnects before timeout fires.
+	go func() {
+		<-client.done
+		timer.Stop()
+	}()
 }
 
 // writePump pumps messages from the hub to the WebSocket connection.

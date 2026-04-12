@@ -918,20 +918,20 @@ New file: `internal/server/server_entra_test.go`. One test function that boots `
 This is the only server-level auth-enabled test; unit tests in Task 2 / Task 7 / Task 8 still cover the isolated pieces, but this test is what proves the wiring itself works.
 
 **Checklist:**
-- [ ] Change `server.New` signature
-- [ ] Construct validator at startup in entra mode
-- [ ] **Delete `cors.Handler` block and import; run `go mod tidy`**
-- [ ] Replace all `BasicAuth` call sites with `APIAuth`
-- [ ] Wrap `/mock/*` group with `EntraRequired`
-- [ ] **Move `/mock/health` out of the `/mock` group (register at root)**
-- [ ] Register `/mock/auth-config` at root (not inside the `/mock` group)
-- [ ] Wire `/mock/api-keys` CRUD routes inside the Entra-protected group
-- [ ] Apply WS scrubber + `EntraRequired` to `/mock/ws`
-- [ ] Arm 30-minute WS reauth timer when `validator != nil`
-- [ ] Update `main.go` call site
-- [ ] Write `server_entra_test.go` with the 8 cases above
-- [ ] `just build` succeeds (catches missed call sites and the CORS removal)
-- [ ] `go test ./...` passes — both the existing disabled-mode tests and the new entra-mode test
+- [x] Change `server.New` signature
+- [x] Construct validator at startup in entra mode
+- [x] **Delete `cors.Handler` block and import; run `go mod tidy`**
+- [x] Replace all `BasicAuth` call sites with `APIAuth`
+- [x] Wrap `/mock/*` group with `EntraRequired`
+- [x] **Move `/mock/health` out of the `/mock` group (register at root)**
+- [x] Register `/mock/auth-config` at root (not inside the `/mock` group)
+- [x] Wire `/mock/api-keys` CRUD routes inside the Entra-protected group
+- [x] Apply WS scrubber + `EntraRequired` to `/mock/ws`
+- [x] Arm 30-minute WS reauth timer when `validator != nil`
+- [x] Update `main.go` call site
+- [x] Write `server_entra_test.go` with the 8 cases above
+- [x] `just build` succeeds (catches missed call sites and the CORS removal)
+- [x] `go test ./...` passes — both the existing disabled-mode tests and the new entra-mode test
 - [ ] Manual smoke: `just dev`, `curl localhost:8025/mock/auth-config` → `{"enabled":false}`
 - [ ] Manual smoke: `just dev`, `curl -i localhost:8025/mock/health` → 200 (confirms the routing move)
 
