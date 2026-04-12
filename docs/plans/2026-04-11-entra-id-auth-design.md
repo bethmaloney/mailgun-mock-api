@@ -793,11 +793,11 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
   - `TestEntraRequired_ProviderUnavailable_503` — validator pointed at a stopped JWKS server; assert 503 + `WWW-Authenticate: Bearer error="temporarily_unavailable"`
 
 **Checklist:**
-- [ ] Implement `EntraRequired` with header + query-param extraction
-- [ ] All 401s set `WWW-Authenticate: Bearer realm=...`
-- [ ] `ErrProviderUnavailable` maps to 503
-- [ ] Add 7 new tests
-- [ ] `go test ./internal/middleware/...` passes
+- [x] Implement `EntraRequired` with header + query-param extraction
+- [x] All 401s set `WWW-Authenticate: Bearer realm=...`
+- [x] `ErrProviderUnavailable` maps to 503
+- [x] Add 7 new tests (plus 1 additional: header-takes-priority-over-query-param)
+- [x] `go test ./internal/middleware/...` passes
 
 ---
 
@@ -1266,7 +1266,7 @@ There are two coupled changes. Do them together — doing either alone leaves th
 | 5  | Implement managed API key CRUD handlers | Done |
 | 6  | Add `managed_keys` mode to Basic-path auth (disabled-mode pathway) | Not Started |
 | 7  | Rename `BasicAuth` → `APIAuth` with dual-auth Bearer path + entra-mode Basic override | Not Started |
-| 8  | Create `EntraRequired` middleware (REST + WS variants) | Not Started |
+| 8  | Create `EntraRequired` middleware (REST + WS variants) | Done |
 | 9  | Create WebSocket log-scrubbing middleware | Not Started |
 | 10 | Add `/mock/auth-config` endpoint | Not Started |
 | 11 | Wire auth into `server.New()` (+ remove unused CORS, move `/mock/health`) | Not Started |

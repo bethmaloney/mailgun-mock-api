@@ -207,6 +207,39 @@ func BasicAuth(configPtr *mock.MockConfig, dbs ...*gorm.DB) func(http.Handler) h
 	return APIAuth(configPtr, db, nil)
 }
 
+// EntraRequired returns a chi-compatible middleware that enforces Entra ID
+// JWT authentication on /mock/* routes. When v is nil (AUTH_MODE=disabled),
+// all requests pass through. Otherwise, a valid JWT must be present either
+// as a Bearer token in the Authorization header or as an access_token query
+// parameter (for WebSocket connections).
+func EntraRequired(v *auth.Validator) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if v == nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+			token := extractBearer(r)
+			if token == "" {
+				token = r.URL.Query().Get("access_token") // WebSocket path
+			}
+			if token == "" {
+				unauthorized(w, wwwAuthBearer, "Unauthenticated")
+				return
+			}
+			if _, err := v.Validate(r.Context(), token); err != nil {
+				if errors.Is(err, auth.ErrProviderUnavailable) {
+					providerUnavailable(w)
+					return
+				}
+				unauthorized(w, wwwAuthBearer, "Invalid token")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // domainLookup is a minimal struct used to query the domains table without
 // importing the domain package (which would create a circular dependency).
 type domainLookup struct {

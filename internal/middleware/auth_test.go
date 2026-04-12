@@ -1363,3 +1363,211 @@ func TestAPIAuth_Bearer_ProviderUnavailable_503(t *testing.T) {
 		t.Errorf("expected WWW-Authenticate %q, got %q", expected, wwwAuth)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// EntraRequired middleware tests
+// ---------------------------------------------------------------------------
+
+func TestEntraRequired_DisabledPassthrough(t *testing.T) {
+	// When validator is nil (disabled mode), requests pass through unconditionally.
+	handler := middleware.EntraRequired(nil)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	// No Authorization header at all
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200 (passthrough), got %d", rec.Code)
+	}
+	if rec.Body.String() != "ok" {
+		t.Errorf("expected body %q, got %q", "ok", rec.Body.String())
+	}
+}
+
+func TestEntraRequired_Header_Valid(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+	v := newTestValidator(t, tp)
+
+	token := signTestToken(t, tp.Key, validTokenClaims(tp.Server.URL))
+
+	handler := middleware.EntraRequired(v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", rec.Code)
+	}
+	if rec.Body.String() != "ok" {
+		t.Errorf("expected body %q, got %q", "ok", rec.Body.String())
+	}
+}
+
+func TestEntraRequired_Header_Invalid_BearerChallenge(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+	v := newTestValidator(t, tp)
+
+	handler := middleware.EntraRequired(v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer invalid-token-value")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", rec.Code)
+	}
+
+	wwwAuth := rec.Header().Get("WWW-Authenticate")
+	expectedChallenge := `Bearer realm="mailgun-mock-api"`
+	if wwwAuth != expectedChallenge {
+		t.Errorf("expected WWW-Authenticate %q, got %q", expectedChallenge, wwwAuth)
+	}
+
+	msg := parseErrorResponse(t, rec)
+	if msg != "Invalid token" {
+		t.Errorf("expected message %q, got %q", "Invalid token", msg)
+	}
+}
+
+func TestEntraRequired_QueryParam_Valid(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+	v := newTestValidator(t, tp)
+
+	token := signTestToken(t, tp.Key, validTokenClaims(tp.Server.URL))
+
+	handler := middleware.EntraRequired(v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/?access_token="+token, nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", rec.Code)
+	}
+	if rec.Body.String() != "ok" {
+		t.Errorf("expected body %q, got %q", "ok", rec.Body.String())
+	}
+}
+
+func TestEntraRequired_QueryParam_Invalid(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+	v := newTestValidator(t, tp)
+
+	handler := middleware.EntraRequired(v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/?access_token=invalid-token-value", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", rec.Code)
+	}
+
+	wwwAuth := rec.Header().Get("WWW-Authenticate")
+	expectedChallenge := `Bearer realm="mailgun-mock-api"`
+	if wwwAuth != expectedChallenge {
+		t.Errorf("expected WWW-Authenticate %q, got %q", expectedChallenge, wwwAuth)
+	}
+
+	msg := parseErrorResponse(t, rec)
+	if msg != "Invalid token" {
+		t.Errorf("expected message %q, got %q", "Invalid token", msg)
+	}
+}
+
+func TestEntraRequired_NoToken_401_BearerChallenge(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+	v := newTestValidator(t, tp)
+
+	handler := middleware.EntraRequired(v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	// No Authorization header, no access_token query param
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", rec.Code)
+	}
+
+	wwwAuth := rec.Header().Get("WWW-Authenticate")
+	expectedChallenge := `Bearer realm="mailgun-mock-api"`
+	if wwwAuth != expectedChallenge {
+		t.Errorf("expected WWW-Authenticate %q, got %q", expectedChallenge, wwwAuth)
+	}
+
+	msg := parseErrorResponse(t, rec)
+	if msg != "Unauthenticated" {
+		t.Errorf("expected message %q, got %q", "Unauthenticated", msg)
+	}
+}
+
+func TestEntraRequired_ProviderUnavailable_503(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	v := newTestValidator(t, tp)
+
+	// Sign a token that would be valid if the provider were reachable.
+	raw := signTestToken(t, tp.Key, validTokenClaims(tp.Server.URL))
+
+	// Stop the OIDC provider so JWKS fetch fails during verification.
+	tp.Server.Close()
+
+	handler := middleware.EntraRequired(v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected status 503 for unavailable provider, got %d", rec.Code)
+	}
+
+	wwwAuth := rec.Header().Get("WWW-Authenticate")
+	expectedChallenge := `Bearer error="temporarily_unavailable"`
+	if wwwAuth != expectedChallenge {
+		t.Errorf("expected WWW-Authenticate %q, got %q", expectedChallenge, wwwAuth)
+	}
+
+	msg := parseErrorResponse(t, rec)
+	if msg != "Auth provider unavailable" {
+		t.Errorf("expected message %q, got %q", "Auth provider unavailable", msg)
+	}
+}
+
+func TestEntraRequired_HeaderTakesPriorityOverQueryParam(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+	v := newTestValidator(t, tp)
+
+	validToken := signTestToken(t, tp.Key, validTokenClaims(tp.Server.URL))
+
+	handler := middleware.EntraRequired(v)(dummyHandler)
+
+	// Valid token in header, invalid token in query param — header wins, request succeeds.
+	req := httptest.NewRequest(http.MethodGet, "/?access_token=invalid-token", nil)
+	req.Header.Set("Authorization", "Bearer "+validToken)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200 (header token wins), got %d", rec.Code)
+	}
+}
