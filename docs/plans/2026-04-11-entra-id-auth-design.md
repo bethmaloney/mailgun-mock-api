@@ -815,10 +815,10 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - Tests: `TestWSLogScrubber_RedactsAccessToken`, `TestWSLogScrubber_LeavesOtherParams`, `TestWSLogScrubber_NoQueryParams`.
 
 **Checklist:**
-- [ ] Decide on implementation approach (per-route manual logging is simpler — prefer it)
-- [ ] Implement `WSLogScrubber`
-- [ ] Add 3 tests
-- [ ] `go test ./internal/middleware/...` passes
+- [x] Decide on implementation approach (per-route manual logging is simpler — prefer it)
+- [x] Implement `WSLogScrubber`
+- [x] Add 3 tests
+- [x] `go test ./internal/middleware/...` passes
 
 ---
 
@@ -1264,10 +1264,10 @@ There are two coupled changes. Do them together — doing either alone leaves th
 | 3  | Add startup validation + context in `cmd/server/main.go` | Done |
 | 4  | Add `ManagedAPIKey` model + migration | Done |
 | 5  | Implement managed API key CRUD handlers | Done |
-| 6  | Add `managed_keys` mode to Basic-path auth (disabled-mode pathway) | Not Started |
-| 7  | Rename `BasicAuth` → `APIAuth` with dual-auth Bearer path + entra-mode Basic override | Not Started |
+| 6  | Add `managed_keys` mode to Basic-path auth (disabled-mode pathway) | Done |
+| 7  | Rename `BasicAuth` → `APIAuth` with dual-auth Bearer path + entra-mode Basic override | Done |
 | 8  | Create `EntraRequired` middleware (REST + WS variants) | Done |
-| 9  | Create WebSocket log-scrubbing middleware | Not Started |
+| 9  | Create WebSocket log-scrubbing middleware | Done |
 | 10 | Add `/mock/auth-config` endpoint | Not Started |
 | 11 | Wire auth into `server.New()` (+ remove unused CORS, move `/mock/health`) | Not Started |
 | 12 | Add `@azure/msal-browser` dependency + `auth/config.ts` | Not Started |
