@@ -115,6 +115,12 @@ const { user, isAuthenticated, signOut } = useAuth();
         >
           Settings
         </router-link>
+        <router-link
+          to="/api-keys"
+          class="nav-item"
+        >
+          API Keys
+        </router-link>
       </nav>
     </aside>
 

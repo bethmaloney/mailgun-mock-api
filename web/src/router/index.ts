@@ -13,6 +13,7 @@ import WebhooksPage from "@/pages/WebhooksPage.vue";
 import SettingsPage from "@/pages/SettingsPage.vue";
 import TriggerEventsPage from "@/pages/TriggerEventsPage.vue";
 import SimulateInboundPage from "@/pages/SimulateInboundPage.vue";
+import ApiKeysPage from "@/pages/ApiKeysPage.vue";
 
 const routes: RouteRecordRaw[] = [
   { path: "/", name: "Dashboard", component: DashboardPage },
@@ -27,6 +28,7 @@ const routes: RouteRecordRaw[] = [
   { path: "/settings", name: "Settings", component: SettingsPage },
   { path: "/trigger-events", name: "TriggerEvents", component: TriggerEventsPage },
   { path: "/simulate-inbound", name: "SimulateInbound", component: SimulateInboundPage },
+  { path: "/api-keys", name: "ApiKeys", component: ApiKeysPage },
 ];
 
 const router = createRouter({

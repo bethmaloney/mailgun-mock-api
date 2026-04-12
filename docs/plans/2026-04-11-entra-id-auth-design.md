@@ -1145,12 +1145,12 @@ There are two coupled changes. Do them together — doing either alone leaves th
 - Keep styling consistent with other pages; copy class names from `MailingListsPage.vue`.
 
 **Checklist:**
-- [ ] Create `ApiKeysPage.vue` with script setup + template + styles
-- [ ] Empty state copy matches design spec
-- [ ] "Just created" panel with copy-to-clipboard
-- [ ] Delete confirmation via `window.confirm`
-- [ ] `npm run lint` passes
-- [ ] `npm run build` succeeds
+- [x] Create `ApiKeysPage.vue` with script setup + template + styles
+- [x] Empty state copy matches design spec
+- [x] "Just created" panel with copy-to-clipboard
+- [x] Delete confirmation via `window.confirm`
+- [x] `npm run lint` passes
+- [x] `npm run build` succeeds
 
 ---
 
@@ -1166,10 +1166,10 @@ There are two coupled changes. Do them together — doing either alone leaves th
 - No router guards — we intentionally scoped out the belt-and-braces guard since `main.ts` already handles the redirect flow (YAGNI).
 
 **Checklist:**
-- [ ] Register route
-- [ ] Add nav link
-- [ ] `npm run lint` passes
-- [ ] `npm run build` succeeds
+- [x] Register route
+- [x] Add nav link
+- [x] `npm run lint` passes
+- [x] `npm run build` succeeds
 - [ ] Manual smoke: `just dev`, click "API Keys" in sidebar, page loads with empty state
 
 ---
@@ -1277,8 +1277,8 @@ There are two coupled changes. Do them together — doing either alone leaves th
 | 16 | Add auth interceptor to `api/client.ts` | Done |
 | 17 | Defer WebSocket connect + thread token into URL | Done |
 | 18 | Add sign-in / user display / sign-out to `App.vue` | Done |
-| 19 | Create `ApiKeysPage.vue` | Not Started |
-| 20 | Register `/api-keys` route + nav link | Not Started |
+| 19 | Create `ApiKeysPage.vue` | Done |
+| 20 | Register `/api-keys` route + nav link | Done |
 | 21 | Update `README.md` with Authentication section | Not Started |
 | 22 | Update `E2E_TESTING.md` with manual verification | Not Started |
 | 23 | Add Playwright E2E spec for API Keys page | Not Started |
