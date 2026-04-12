@@ -19,6 +19,9 @@ RUN CGO_ENABLED=0 go build -o mailgun-mock-api ./cmd/server
 FROM docker.io/alpine:3.21
 RUN apk add --no-cache ca-certificates
 COPY --from=backend /app/mailgun-mock-api /usr/local/bin/mailgun-mock-api
+RUN mkdir -p /data
+VOLUME /data
+ENV DATABASE_URL="file:/data/mailgun-mock.db"
 EXPOSE 8025
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
   CMD wget -qO- http://localhost:8025/mock/health || exit 1

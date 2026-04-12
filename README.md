@@ -10,7 +10,58 @@ Point your Mailgun client at this service instead of `api.mailgun.net` and every
 - **CI/CD testing** — assert on email content, recipients, and events without network calls
 - **Drop-in replacement** — uses the same API shape as real Mailgun, compatible with official SDKs
 
-## Planned Features
+## Quick Start
+
+### Docker
+
+```bash
+docker run -p 8025:8025 ghcr.io/bethmaloney/mailgun-mock-api:latest
+```
+
+The web UI is at `http://localhost:8025` and the API is available at the same address. Point your Mailgun SDK at `http://localhost:8025` and use any string as the API key.
+
+### Pre-built binaries
+
+Download from [GitHub Releases](https://github.com/bethmaloney/mailgun-mock-api/releases) for Linux (x64), macOS (Apple Silicon), or Windows (x64).
+
+```bash
+./mailgun-mock-api
+```
+
+### Data persistence
+
+By default the Docker image stores its SQLite database at `/data/mailgun-mock.db`. Without a volume mount, data is ephemeral — it's discarded when the container is removed. This is fine for CI or throwaway dev sessions.
+
+To persist data across container restarts, mount a volume:
+
+```bash
+docker run -p 8025:8025 -v mailgun-data:/data ghcr.io/bethmaloney/mailgun-mock-api:latest
+```
+
+Or bind-mount a host directory:
+
+```bash
+docker run -p 8025:8025 -v ./data:/data ghcr.io/bethmaloney/mailgun-mock-api:latest
+```
+
+### Configuration
+
+All settings are configured via environment variables.
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `8025` | HTTP listen port |
+| `DATABASE_URL` | `file:mailgun-mock.db` | SQLite connection string (or Postgres URL) |
+| `DB_DRIVER` | `sqlite` | Database driver: `sqlite` or `postgres` |
+| `AUTH_MODE` | `disabled` | Authentication mode: `disabled` or `entra` |
+
+Example with Docker:
+
+```bash
+docker run -p 9090:9090 -e PORT=9090 -v mailgun-data:/data ghcr.io/bethmaloney/mailgun-mock-api:latest
+```
+
+## Features
 
 | Area | Description |
 |------|-------------|
@@ -24,8 +75,6 @@ Point your Mailgun client at this service instead of `api.mailgun.net` and every
 | Mailing Lists | List and member CRUD, bulk operations |
 | Routes | Inbound route management |
 | Web UI | Inspect messages, view events, manage suppressions |
-
-See [`implementation_plan/overview.md`](implementation_plan/overview.md) for the full breakdown.
 
 ## Development
 
@@ -66,6 +115,19 @@ Auth is disabled by default. `just dev` works without any Entra ID setup.
 | `ENTRA_CLIENT_ID` | App registration client ID |
 | `ENTRA_API_SCOPE` | API scope name, e.g. `access_as_user` |
 | `ENTRA_REDIRECT_URI` | Public URL of this deployment |
+
+With Docker:
+
+```bash
+docker run -p 8025:8025 \
+  -v mailgun-data:/data \
+  -e AUTH_MODE=entra \
+  -e ENTRA_TENANT_ID=your-tenant-id \
+  -e ENTRA_CLIENT_ID=your-client-id \
+  -e ENTRA_API_SCOPE=access_as_user \
+  -e ENTRA_REDIRECT_URI=https://mailgun-mock.example.com \
+  ghcr.io/bethmaloney/mailgun-mock-api:latest
+```
 
 After deploying, sign in to the UI, navigate to Config → API Keys, and create your first key. Give the key to your test apps — they use it as the Basic Auth password (`api:<key>`), exactly like a real Mailgun key.
 
