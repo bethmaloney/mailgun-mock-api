@@ -46,7 +46,7 @@ func New(db *gorm.DB) http.Handler {
 	}))
 
 	// Run model migrations.
-	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &message.Attachment{}, &event.Event{},
+	db.AutoMigrate(&domain.Domain{}, &domain.DNSRecord{}, &credential.SMTPCredential{}, &apikey.APIKey{}, &apikey.ManagedAPIKey{}, &allowlist.IPAllowlistEntry{}, &message.StoredMessage{}, &message.Attachment{}, &event.Event{},
 		&suppression.Bounce{}, &suppression.Complaint{}, &suppression.Unsubscribe{}, &suppression.AllowlistEntry{},
 		&template.Template{}, &template.TemplateVersion{},
 		&tag.Tag{},

@@ -679,9 +679,9 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - Register in the `db.AutoMigrate(...)` call at `internal/server/server.go:49` by adding `&apikey.ManagedAPIKey{}` to the existing list.
 
 **Checklist:**
-- [ ] Create `internal/apikey/managed.go` with the model + key-generator helper
-- [ ] Add `&apikey.ManagedAPIKey{}` to `AutoMigrate` call in `server.go`
-- [ ] `go build ./...` succeeds
+- [x] Create `internal/apikey/managed.go` with the model + key-generator helper
+- [x] Add `&apikey.ManagedAPIKey{}` to `AutoMigrate` call in `server.go`
+- [x] `go build ./...` succeeds
 - [ ] Run server locally with `just dev` — confirm new table is created (log check or sqlite inspection)
 
 ---
@@ -702,9 +702,9 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - **Not** wired into routes yet — that's Task 11.
 
 **Checklist:**
-- [ ] Create `managed_handlers.go` with `ManagedHandlers`, `NewManagedHandlers`, `List`, `Create`, `Delete`
-- [ ] Write `managed_handlers_test.go` with the 6 cases above
-- [ ] `go test ./internal/apikey/...` passes
+- [x] Create `managed_handlers.go` with `ManagedHandlers`, `NewManagedHandlers`, `List`, `Create`, `Delete`
+- [x] Write `managed_handlers_test.go` with the 6 cases above
+- [x] `go test ./internal/apikey/...` passes
 
 ---
 
