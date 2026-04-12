@@ -1204,13 +1204,13 @@ There are two coupled changes. Do them together — doing either alone leaves th
     - "`503 Service Unavailable` on requests" → the server couldn't reach Microsoft's JWKS endpoint. Check egress firewall rules for `login.microsoftonline.com`.
 
 **Checklist:**
-- [ ] Write Authentication section in README
-- [ ] Include app registration steps (SPA redirect URIs, logout URL, scope, `accessTokenAcceptedVersion`, optional group claims)
-- [ ] Document both `:5173` and `:8025` redirect URIs for local Entra testing (H9)
-- [ ] Include env var table
-- [ ] Include first-API-key walkthrough
-- [ ] Include five troubleshooting items (incl. scope failure and 503)
-- [ ] Verify Markdown renders correctly (visual check in editor preview)
+- [x] Write Authentication section in README
+- [x] Include app registration steps (SPA redirect URIs, logout URL, scope, `accessTokenAcceptedVersion`, optional group claims)
+- [x] Document both `:5173` and `:8025` redirect URIs for local Entra testing (H9)
+- [x] Include env var table
+- [x] Include first-API-key walkthrough
+- [x] Include five troubleshooting items (incl. scope failure and 503)
+- [x] Verify Markdown renders correctly (visual check in editor preview)
 
 ---
 
@@ -1279,6 +1279,6 @@ There are two coupled changes. Do them together — doing either alone leaves th
 | 18 | Add sign-in / user display / sign-out to `App.vue` | Done |
 | 19 | Create `ApiKeysPage.vue` | Done |
 | 20 | Register `/api-keys` route + nav link | Done |
-| 21 | Update `README.md` with Authentication section | Not Started |
+| 21 | Update `README.md` with Authentication section | Done |
 | 22 | Update `E2E_TESTING.md` with manual verification | Not Started |
 | 23 | Add Playwright E2E spec for API Keys page | Not Started |
