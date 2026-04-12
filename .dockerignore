@@ -1,0 +1,26 @@
+# Build artifacts
+mailgun-mock-api
+*.db
+web/dist/
+web/node_modules/
+internal/server/static/
+
+# Dev/test files
+.git
+.github
+.claude/
+.env
+.env.*
+*.log
+coverage/
+.nyc_output/
+tmp/
+.cache/
+web/e2e/
+web/test-results/
+web/playwright-report/
+
+# Docs
+implementation_plan/
+docs/
+*.md
