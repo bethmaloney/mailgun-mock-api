@@ -932,8 +932,8 @@ This is the only server-level auth-enabled test; unit tests in Task 2 / Task 7 /
 - [x] Write `server_entra_test.go` with the 8 cases above
 - [x] `just build` succeeds (catches missed call sites and the CORS removal)
 - [x] `go test ./...` passes — both the existing disabled-mode tests and the new entra-mode test
-- [ ] Manual smoke: `just dev`, `curl localhost:8025/mock/auth-config` → `{"enabled":false}`
-- [ ] Manual smoke: `just dev`, `curl -i localhost:8025/mock/health` → 200 (confirms the routing move)
+- [x] Manual smoke: `just dev`, `curl localhost:8025/mock/auth-config` → `{"enabled":false}`
+- [x] Manual smoke: `just dev`, `curl -i localhost:8025/mock/health` → 200 (confirms the routing move)
 
 ---
 
@@ -970,10 +970,10 @@ This is the only server-level auth-enabled test; unit tests in Task 2 / Task 7 /
 - No tests — this is a trivial fetch wrapper; covered end-to-end by Task 23.
 
 **Checklist:**
-- [ ] `npm install @azure/msal-browser` in `web/`
-- [ ] Create `web/src/auth/config.ts`
-- [ ] `npm run lint` in `web/` passes
-- [ ] `npm run build` in `web/` succeeds
+- [x] `npm install @azure/msal-browser` in `web/`
+- [x] Create `web/src/auth/config.ts`
+- [x] `npm run lint` in `web/` passes
+- [x] `npm run build` in `web/` succeeds
 
 ---
 
@@ -995,10 +995,10 @@ This is the only server-level auth-enabled test; unit tests in Task 2 / Task 7 /
 - No unit tests — MSAL is Microsoft's library; we trust it. Integration verification in Task 15's manual smoke.
 
 **Checklist:**
-- [ ] Create `msalInstance.ts` with the functions above
-- [ ] `signOut` uses `logoutRedirect` with `postLogoutRedirectUri`
-- [ ] `npm run lint` passes
-- [ ] `npm run build` succeeds
+- [x] Create `msalInstance.ts` with the functions above
+- [x] `signOut` uses `logoutRedirect` with `postLogoutRedirectUri`
+- [x] `npm run lint` passes
+- [x] `npm run build` succeeds
 
 ---
 
@@ -1014,9 +1014,9 @@ This is the only server-level auth-enabled test; unit tests in Task 2 / Task 7 /
 - Gracefully handles `msalInstance === null` (disabled mode): returns static `{ isAuthenticated: computed(() => false), user: computed(() => null), signIn: noop, signOut: noop }`.
 
 **Checklist:**
-- [ ] Create `useAuth.ts`
-- [ ] `npm run lint` passes
-- [ ] `npm run build` succeeds
+- [x] Create `useAuth.ts`
+- [x] `npm run lint` passes
+- [x] `npm run build` succeeds
 
 ---
 
