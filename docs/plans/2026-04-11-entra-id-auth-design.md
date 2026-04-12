@@ -1281,4 +1281,4 @@ There are two coupled changes. Do them together — doing either alone leaves th
 | 20 | Register `/api-keys` route + nav link | Done |
 | 21 | Update `README.md` with Authentication section | Done |
 | 22 | Update `E2E_TESTING.md` with manual verification | Done |
-| 23 | Add Playwright E2E spec for API Keys page | Not Started |
+| 23 | Add Playwright E2E spec for API Keys page | Done |
