@@ -623,14 +623,14 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - **Note on gotcha:** test tokens should use issuer `<httptest-server-url>/v2.0` to match what `NewValidator` builds — parameterize via an internal `newValidatorForIssuer` helper the test can call.
 
 **Checklist:**
-- [ ] `go get github.com/coreos/go-oidc/v3@latest`
-- [ ] `go get github.com/golang-jwt/jwt/v5@latest` (direct test dep)
-- [ ] Export `ErrProviderUnavailable` sentinel
-- [ ] Write `validator.go` with `Claims` (incl. `Scope`), `Validator` (incl. `requiredScope`), `NewValidator`, `Validate` with scope check and JWKS-failure translation
-- [ ] Expose an unexported `newValidatorForIssuer(ctx, issuerURL, aud, requiredScope)` used by tests only
-- [ ] Write `validator_test.go` with the eight cases above (incl. `ErrProviderUnavailable` assertion)
-- [ ] `go test ./internal/auth/...` passes
-- [ ] `go build ./...` still compiles
+- [x] `go get github.com/coreos/go-oidc/v3@latest`
+- [x] `go get github.com/golang-jwt/jwt/v5@latest` (direct test dep)
+- [x] Export `ErrProviderUnavailable` sentinel
+- [x] Write `validator.go` with `Claims` (incl. `Scope`), `Validator` (incl. `requiredScope`), `NewValidator`, `Validate` with scope check and JWKS-failure translation
+- [x] Expose an unexported `newValidatorForIssuer(ctx, issuerURL, aud, requiredScope)` used by tests only
+- [x] Write `validator_test.go` with the eight cases above (incl. `ErrProviderUnavailable` assertion)
+- [x] `go test ./internal/auth/...` passes
+- [x] `go build ./...` still compiles
 
 ---
 
@@ -1260,7 +1260,7 @@ There are two coupled changes. Do them together — doing either alone leaves th
 | Task | Description | Status |
 |------|-------------|--------|
 | 1  | Extend `config.Config` with Entra fields + `Validate()` | Done |
-| 2  | Create `internal/auth` package with `Validator` | Not Started |
+| 2  | Create `internal/auth` package with `Validator` | Done |
 | 3  | Add startup validation + context in `cmd/server/main.go` | Not Started |
 | 4  | Add `ManagedAPIKey` model + migration | Not Started |
 | 5  | Implement managed API key CRUD handlers | Not Started |
