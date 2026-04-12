@@ -589,11 +589,11 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - Tests cover: disabled mode ignores Entra vars; entra mode with all vars set returns nil; entra mode missing any one var returns a specific error naming the missing var.
 
 **Checklist:**
-- [ ] Add new `Config` fields
-- [ ] Extend `Load()` with new env vars
-- [ ] Add `Validate()` method
-- [ ] Write `config_test.go` with disabled-mode, full-entra, and missing-var cases
-- [ ] `go test ./internal/config/...` passes
+- [x] Add new `Config` fields
+- [x] Extend `Load()` with new env vars
+- [x] Add `Validate()` method (includes unknown AuthMode rejection)
+- [x] Write `config_test.go` with disabled-mode, full-entra, missing-var, and unknown-AuthMode cases
+- [x] `go test ./internal/config/...` passes
 
 ---
 
@@ -1259,7 +1259,7 @@ There are two coupled changes. Do them together — doing either alone leaves th
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 1  | Extend `config.Config` with Entra fields + `Validate()` | Not Started |
+| 1  | Extend `config.Config` with Entra fields + `Validate()` | Done |
 | 2  | Create `internal/auth` package with `Validator` | Not Started |
 | 3  | Add startup validation + context in `cmd/server/main.go` | Not Started |
 | 4  | Add `ManagedAPIKey` model + migration | Not Started |
