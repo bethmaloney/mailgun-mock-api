@@ -723,12 +723,12 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
 - Extend `auth_test.go`: `TestBasicAuth_ManagedKeys_Valid`, `TestBasicAuth_ManagedKeys_Invalid`, `TestBasicAuth_ManagedKeys_EmptyTable`.
 
 **Checklist:**
-- [ ] Add `managed_keys` case to `BasicAuth` switch
-- [ ] Change `BasicAuth` signature to accept `*gorm.DB`
-- [ ] Update all call sites in `server.go` (mechanical)
-- [ ] Extend `auth_test.go` with 3 new cases
-- [ ] `go test ./internal/middleware/...` passes
-- [ ] `go build ./...` passes (catches missed call sites)
+- [x] Add `managed_keys` case to `BasicAuth` switch
+- [x] Change `BasicAuth` signature to accept `*gorm.DB`
+- [x] Update all call sites in `server.go` (mechanical)
+- [x] Extend `auth_test.go` with 3 new cases
+- [x] `go test ./internal/middleware/...` passes
+- [x] `go build ./...` passes (catches missed call sites)
 
 ---
 

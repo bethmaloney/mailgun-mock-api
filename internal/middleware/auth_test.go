@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/bethmaloney/mailgun-mock-api/internal/apikey"
 	"github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
@@ -36,7 +37,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
-	if err := db.AutoMigrate(&testDomain{}); err != nil {
+	if err := db.AutoMigrate(&testDomain{}, &apikey.ManagedAPIKey{}); err != nil {
 		t.Fatalf("failed to migrate domains table: %v", err)
 	}
 	return db
@@ -864,4 +865,96 @@ func TestBasicAuth_WorksWithDifferentHTTPMethods(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Managed Keys auth mode
+// ---------------------------------------------------------------------------
+
+func TestBasicAuth_ManagedKeys_Valid(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := newMockConfig("managed_keys", "")
+
+	key := apikey.ManagedAPIKey{Name: "test-key", KeyValue: "mock_testkey123", Prefix: "mock_testkey1"}
+	if err := db.Create(&key).Error; err != nil {
+		t.Fatalf("failed to create managed API key: %v", err)
+	}
+
+	handler := middleware.BasicAuth(cfg, db)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", basicAuthHeader("api", "mock_testkey123"))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	t.Run("returns 200 for valid managed key", func(t *testing.T) {
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+	})
+
+	t.Run("passes through to next handler", func(t *testing.T) {
+		if rec.Body.String() != "ok" {
+			t.Errorf("expected body %q, got %q", "ok", rec.Body.String())
+		}
+	})
+}
+
+func TestBasicAuth_ManagedKeys_Invalid(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := newMockConfig("managed_keys", "")
+
+	key := apikey.ManagedAPIKey{Name: "test-key", KeyValue: "mock_testkey123", Prefix: "mock_testkey1"}
+	if err := db.Create(&key).Error; err != nil {
+		t.Fatalf("failed to create managed API key: %v", err)
+	}
+
+	handler := middleware.BasicAuth(cfg, db)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", basicAuthHeader("api", "wrong-key"))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	t.Run("returns 401 for invalid managed key", func(t *testing.T) {
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected status 401, got %d", rec.Code)
+		}
+	})
+
+	t.Run("returns Forbidden message", func(t *testing.T) {
+		msg := parseErrorResponse(t, rec)
+		if msg != "Forbidden" {
+			t.Errorf("expected message %q, got %q", "Forbidden", msg)
+		}
+	})
+}
+
+func TestBasicAuth_ManagedKeys_EmptyTable(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := newMockConfig("managed_keys", "")
+
+	// Do NOT insert any managed API keys.
+	handler := middleware.BasicAuth(cfg, db)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", basicAuthHeader("api", "some-key"))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	t.Run("returns 401 when no managed keys exist", func(t *testing.T) {
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected status 401, got %d", rec.Code)
+		}
+	})
+
+	t.Run("returns Forbidden message", func(t *testing.T) {
+		msg := parseErrorResponse(t, rec)
+		if msg != "Forbidden" {
+			t.Errorf("expected message %q, got %q", "Forbidden", msg)
+		}
+	})
 }

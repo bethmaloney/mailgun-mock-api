@@ -115,12 +115,12 @@ func New(db *gorm.DB) http.Handler {
 	mtrH := metrics.NewHandlers(db)
 
 	// Account-level stats (v3) — register before wildcard {domain_name} routes
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/stats/total", mtrH.GetAccountStats)
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/stats/filter", mtrH.GetFilteredStats)
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/stats/total/domains", mtrH.GetDomainStatsSnapshot)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/stats/total", mtrH.GetAccountStats)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/stats/filter", mtrH.GetFilteredStats)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/stats/total/domains", mtrH.GetDomainStatsSnapshot)
 
 	r.Route("/v4/domains", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Use(appMiddleware.SubaccountScoping(db))
 		r.Post("/", dh.CreateDomain)
 		r.Get("/", dh.ListDomains)
@@ -134,7 +134,7 @@ func New(db *gorm.DB) http.Handler {
 	})
 
 	r.Route("/v3/domains", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Delete("/{name}", dh.DeleteDomain)
 		r.Get("/{name}/tracking", dh.GetTracking)
 		r.Put("/{name}/tracking/open", dh.UpdateOpenTracking)
@@ -160,7 +160,7 @@ func New(db *gorm.DB) http.Handler {
 
 	// v3 domain webhook routes
 	r.Route("/v3/domains/{domain_name}/webhooks", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", wh.ListWebhooks)
 		r.Post("/", wh.CreateWebhook)
 		r.Get("/{webhook_name}", wh.GetWebhook)
@@ -170,7 +170,7 @@ func New(db *gorm.DB) http.Handler {
 
 	// Subaccount routes
 	r.Route("/v5/accounts/subaccounts", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Post("/", sah.CreateSubaccount)
 		r.Get("/", sah.ListSubaccounts)
 		r.Delete("/", sah.DeleteSubaccount)
@@ -184,12 +184,12 @@ func New(db *gorm.DB) http.Handler {
 	})
 
 	// v5 signing key routes
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v5/accounts/http_signing_key", wh.GetSigningKey)
-	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v5/accounts/http_signing_key", wh.RegenerateSigningKey)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v5/accounts/http_signing_key", wh.GetSigningKey)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Post("/v5/accounts/http_signing_key", wh.RegenerateSigningKey)
 
 	// v1 account webhook routes
 	r.Route("/v1/webhooks", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", wh.ListAccountWebhooks)
 		r.Post("/", wh.CreateAccountWebhook)
 		r.Delete("/", wh.BulkDeleteAccountWebhooks)
@@ -200,7 +200,7 @@ func New(db *gorm.DB) http.Handler {
 
 	// Route CRUD (account-level, not domain-scoped)
 	r.Route("/v3/routes", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Post("/", rth.CreateRoute)
 		r.Get("/", rth.ListRoutes)
 		r.Get("/match", rth.MatchRoute)
@@ -211,22 +211,22 @@ func New(db *gorm.DB) http.Handler {
 
 	// Message sending route
 	r.Route("/v3/{domain_name}/messages", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Post("/", mh.SendMessage)
 	})
 
 	// Events route
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/events", eh.ListEvents)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/{domain_name}/events", eh.ListEvents)
 
 	// MIME message sending route
-	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v3/{domain_name}/messages.mime", mh.SendMIMEMessage)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Post("/v3/{domain_name}/messages.mime", mh.SendMIMEMessage)
 
 	// Delete envelopes (purge queue) route
-	r.With(appMiddleware.BasicAuth(h.Config())).Delete("/v3/{domain_name}/envelopes", mh.DeleteEnvelopes)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Delete("/v3/{domain_name}/envelopes", mh.DeleteEnvelopes)
 
 	// Message storage routes (retrieve / delete / resend)
 	r.Route("/v3/domains/{domain_name}/messages", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/{storage_key}", mh.GetMessage)
 		r.Delete("/{storage_key}", mh.DeleteMessage)
 		r.Post("/{storage_key}", mh.ResendMessage)
@@ -234,11 +234,11 @@ func New(db *gorm.DB) http.Handler {
 	})
 
 	// Sending queues route
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/domains/{domain_name}/sending_queues", mh.GetSendingQueues)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/domains/{domain_name}/sending_queues", mh.GetSendingQueues)
 
 	// Suppression routes
 	r.Route("/v3/{domain_name}/bounces", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", sh.ListBounces)
 		r.Post("/", sh.CreateBounces)
 		r.Post("/import", sh.ImportBounces)
@@ -247,7 +247,7 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/", sh.ClearBounces)
 	})
 	r.Route("/v3/{domain_name}/complaints", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", sh.ListComplaints)
 		r.Post("/", sh.CreateComplaints)
 		r.Post("/import", sh.ImportComplaints)
@@ -256,7 +256,7 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/", sh.ClearComplaints)
 	})
 	r.Route("/v3/{domain_name}/unsubscribes", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", sh.ListUnsubscribes)
 		r.Post("/", sh.CreateUnsubscribes)
 		r.Post("/import", sh.ImportUnsubscribes)
@@ -265,7 +265,7 @@ func New(db *gorm.DB) http.Handler {
 		r.Delete("/", sh.ClearUnsubscribes)
 	})
 	r.Route("/v3/{domain_name}/whitelists", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", sh.ListAllowlist)
 		r.Post("/", sh.CreateAllowlistEntry)
 		r.Post("/import", sh.ImportAllowlist)
@@ -276,7 +276,7 @@ func New(db *gorm.DB) http.Handler {
 
 	// Template routes
 	r.Route("/v3/{domain_name}/templates", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Post("/", th.CreateTemplate)
 		r.Get("/", th.ListTemplates)
 		r.Delete("/", th.DeleteAllTemplates)
@@ -293,7 +293,7 @@ func New(db *gorm.DB) http.Handler {
 
 	// Tag routes
 	r.Route("/v3/{domain_name}/tags", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", tgh.ListTags)
 		r.Get("/{tag}", tgh.GetTag)
 		r.Put("/{tag}", tgh.UpdateTag)
@@ -308,7 +308,7 @@ func New(db *gorm.DB) http.Handler {
 
 	// Singular tag paths (OpenAPI spec style — tag from query parameter)
 	r.Route("/v3/{domain_name}/tag", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", tgh.GetTagByQuery)
 		r.Get("/stats", tgh.GetTagStatsByQuery)
 		r.Get("/stats/aggregates/countries", tgh.GetTagStatsCountriesByQuery)
@@ -317,19 +317,19 @@ func New(db *gorm.DB) http.Handler {
 	})
 
 	// Domain-level stats
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/stats/total", tgh.GetDomainStats)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/{domain_name}/stats/total", tgh.GetDomainStats)
 
 	// Domain aggregate stubs (v3)
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/aggregates/providers", mtrH.GetDomainAggregateProviders)
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/aggregates/devices", mtrH.GetDomainAggregateDevices)
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/{domain_name}/aggregates/countries", mtrH.GetDomainAggregateCountries)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/{domain_name}/aggregates/providers", mtrH.GetDomainAggregateProviders)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/{domain_name}/aggregates/devices", mtrH.GetDomainAggregateDevices)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/{domain_name}/aggregates/countries", mtrH.GetDomainAggregateCountries)
 
 	// Tag limits route (different path pattern)
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/domains/{domain_name}/limits/tag", tgh.GetTagLimits)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/domains/{domain_name}/limits/tag", tgh.GetTagLimits)
 
 	// v1 Analytics Tags API (account-level, not domain-scoped)
 	r.Route("/v1/analytics/tags", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Post("/", tgh.V1ListTags)
 		r.Put("/", tgh.V1UpdateTag)
 		r.Delete("/", tgh.V1DeleteTag)
@@ -337,15 +337,15 @@ func New(db *gorm.DB) http.Handler {
 	})
 
 	// v1 analytics metrics
-	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v1/analytics/metrics", mtrH.QueryMetrics)
-	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v1/analytics/usage/metrics", mtrH.QueryUsageMetrics)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Post("/v1/analytics/metrics", mtrH.QueryMetrics)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Post("/v1/analytics/usage/metrics", mtrH.QueryUsageMetrics)
 
 	// v2 bounce classification
-	r.With(appMiddleware.BasicAuth(h.Config())).Post("/v2/bounce-classification/metrics", mtrH.QueryBounceClassification)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Post("/v2/bounce-classification/metrics", mtrH.QueryBounceClassification)
 
 	// Mailing list routes
 	r.Route("/v3/lists", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Post("/", mlh.CreateList)
 		r.Get("/", mlh.ListListsLegacy)
 		r.Get("/pages", mlh.ListLists)
@@ -364,7 +364,7 @@ func New(db *gorm.DB) http.Handler {
 
 	// API Key routes
 	r.Route("/v1/keys", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", kh.ListKeys)
 		r.Post("/", kh.CreateKey)
 		r.Get("/public", kh.GetPublicKey)
@@ -375,7 +375,7 @@ func New(db *gorm.DB) http.Handler {
 
 	// IP Allowlist routes
 	r.Route("/v2/ip_whitelist", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", ah.ListEntries)
 		r.Post("/", ah.AddEntry)
 		r.Put("/", ah.UpdateEntry)
@@ -383,12 +383,12 @@ func New(db *gorm.DB) http.Handler {
 	})
 
 	// IP routes (account-level)
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/ips", iph.ListIPs)
-	r.With(appMiddleware.BasicAuth(h.Config())).Get("/v3/ips/{ip}", iph.GetIP)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/ips", iph.ListIPs)
+	r.With(appMiddleware.BasicAuth(h.Config(), db)).Get("/v3/ips/{ip}", iph.GetIP)
 
 	// IP Pool routes (v1 prefix)
 	r.Route("/v1/ip_pools", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", iph.ListPools)
 		r.Post("/", iph.CreatePool)
 		r.Get("/{pool_id}", iph.GetPool)
@@ -398,7 +398,7 @@ func New(db *gorm.DB) http.Handler {
 
 	// IP Pool routes (v3 prefix -- same handlers)
 	r.Route("/v3/ip_pools", func(r chi.Router) {
-		r.Use(appMiddleware.BasicAuth(h.Config()))
+		r.Use(appMiddleware.BasicAuth(h.Config(), db))
 		r.Get("/", iph.ListPools)
 		r.Post("/", iph.CreatePool)
 		r.Get("/{pool_id}", iph.GetPool)

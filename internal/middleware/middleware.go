@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"net/http"
 
+	"github.com/bethmaloney/mailgun-mock-api/internal/apikey"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/bethmaloney/mailgun-mock-api/internal/response"
 	"github.com/go-chi/chi/v5"
@@ -82,7 +83,11 @@ func DomainFromContext(ctx context.Context) string {
 //   - "accept_any": Skip all auth checks — pass every request through
 //   - "single": Validate HTTP Basic Auth format AND password matches SigningKey
 //   - "full" (default): Validate HTTP Basic Auth format (username "api", non-empty password)
-func BasicAuth(configPtr *mock.MockConfig) func(http.Handler) http.Handler {
+func BasicAuth(configPtr *mock.MockConfig, dbs ...*gorm.DB) func(http.Handler) http.Handler {
+	var db *gorm.DB
+	if len(dbs) > 0 {
+		db = dbs[0]
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authMode := configPtr.Authentication.AuthMode
@@ -99,6 +104,23 @@ func BasicAuth(configPtr *mock.MockConfig) func(http.Handler) http.Handler {
 					return
 				}
 				if subtle.ConstantTimeCompare([]byte(password), []byte(signingKey)) != 1 {
+					response.RespondError(w, http.StatusUnauthorized, "Forbidden")
+					return
+				}
+				next.ServeHTTP(w, r)
+
+			case "managed_keys":
+				username, password, ok := r.BasicAuth()
+				if !ok || username != "api" || password == "" {
+					response.RespondError(w, http.StatusUnauthorized, "Forbidden")
+					return
+				}
+				if db == nil {
+					response.RespondError(w, http.StatusInternalServerError, "managed_keys mode requires a database connection")
+					return
+				}
+				var key apikey.ManagedAPIKey
+				if err := db.Where("key_value = ?", password).First(&key).Error; err != nil {
 					response.RespondError(w, http.StatusUnauthorized, "Forbidden")
 					return
 				}
