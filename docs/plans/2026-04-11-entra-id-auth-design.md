@@ -1225,9 +1225,9 @@ There are two coupled changes. Do them together — doing either alone leaves th
 - Steps: set env vars, start server, open browser to redirect URI, confirm redirect to `login.microsoftonline.com`, sign in, confirm redirect back, confirm dashboard renders, open network tab and confirm requests carry `Authorization: Bearer`, navigate to API Keys, create a key, copy the value, run `curl -u api:<key> http://localhost:8025/v4/domains` and confirm 200.
 
 **Checklist:**
-- [ ] Add manual-verification section
-- [ ] List the numbered verification steps
-- [ ] Include the curl smoke test
+- [x] Add manual-verification section
+- [x] List the numbered verification steps
+- [x] Include the curl smoke test
 
 ---
 
@@ -1280,5 +1280,5 @@ There are two coupled changes. Do them together — doing either alone leaves th
 | 19 | Create `ApiKeysPage.vue` | Done |
 | 20 | Register `/api-keys` route + nav link | Done |
 | 21 | Update `README.md` with Authentication section | Done |
-| 22 | Update `E2E_TESTING.md` with manual verification | Not Started |
+| 22 | Update `E2E_TESTING.md` with manual verification | Done |
 | 23 | Add Playwright E2E spec for API Keys page | Not Started |

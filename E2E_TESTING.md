@@ -175,3 +175,34 @@ Comprehensive Playwright test plan for 100% frontend behavior coverage.
 - [x] StatusBadge colors — verify correct colors for delivered (green), opened (blue), failed (red), unsubscribed (orange)
 - [x] Pagination disabled states — Previous disabled on first page, Next disabled on last page
 - [x] WebSocket connection indicator — verify green dot when connected in sidebar
+
+---
+
+## Manual verification: Entra ID flow
+
+The Entra ID authentication flow cannot be tested with Playwright (it requires a real Microsoft tenant and interactive browser login). Use this manual procedure to verify the integration end-to-end.
+
+1. Set the required environment variables:
+   ```
+   AUTH_MODE=entra
+   ENTRA_TENANT_ID=<your-tenant-id>
+   ENTRA_CLIENT_ID=<your-client-id>
+   ENTRA_API_SCOPE=access_as_user
+   ENTRA_REDIRECT_URI=http://localhost:8025
+   ```
+2. Start the server with `just dev` or `just run`.
+3. Open a browser to `http://localhost:8025` (the redirect URI).
+4. Confirm the browser redirects to `login.microsoftonline.com` for authentication.
+5. Sign in with an authorized Entra ID account.
+6. Confirm the browser redirects back to the SPA and the dashboard renders correctly.
+7. Open browser DevTools Network tab and confirm that API requests carry `Authorization: Bearer <jwt>` headers.
+8. Navigate to **Config → API Keys** in the sidebar.
+9. Create a new API key with a name (e.g., "test-key").
+10. Copy the plaintext key value from the "just created" panel.
+11. Verify the key works by running:
+    ```
+    curl -u api:<key> http://localhost:8025/v4/domains
+    ```
+    Confirm a 200 response with domain data.
+12. Click **Sign out** in the sidebar. Confirm the browser redirects to Microsoft logout, then back to the sign-in page.
+13. Verify WebSocket: in DevTools, check that the WS connection URL includes a `?access_token=<jwt>` query parameter and the connection indicator in the sidebar shows green.
