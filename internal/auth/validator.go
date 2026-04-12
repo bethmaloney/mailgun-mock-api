@@ -32,10 +32,15 @@ type Validator struct {
 // NewValidator creates a Validator using OIDC discovery against Entra ID.
 func NewValidator(ctx context.Context, tenantID, expectedAud, requiredScope string) (*Validator, error) {
 	issuer := fmt.Sprintf("https://login.microsoftonline.com/%s/v2.0", tenantID)
-	return newValidatorForIssuer(ctx, issuer, expectedAud, requiredScope)
+	return NewValidatorForIssuer(ctx, issuer, expectedAud, requiredScope)
 }
 
-// newValidatorForIssuer is an internal helper for tests that need to override the issuer URL.
+// NewValidatorForIssuer creates a Validator using a custom issuer URL.
+func NewValidatorForIssuer(ctx context.Context, issuerURL, expectedAud, requiredScope string) (*Validator, error) {
+	return newValidatorForIssuer(ctx, issuerURL, expectedAud, requiredScope)
+}
+
+// newValidatorForIssuer is the internal implementation used by NewValidator and NewValidatorForIssuer.
 func newValidatorForIssuer(ctx context.Context, issuerURL, expectedAud, requiredScope string) (*Validator, error) {
 	provider, err := oidc.NewProvider(ctx, issuerURL)
 	if err != nil {

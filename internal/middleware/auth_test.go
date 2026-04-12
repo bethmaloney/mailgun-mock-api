@@ -2,16 +2,23 @@ package middleware_test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/bethmaloney/mailgun-mock-api/internal/apikey"
+	"github.com/bethmaloney/mailgun-mock-api/internal/auth"
 	"github.com/bethmaloney/mailgun-mock-api/internal/middleware"
 	"github.com/bethmaloney/mailgun-mock-api/internal/mock"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -83,12 +90,109 @@ func parseErrorResponse(t *testing.T, rec *httptest.ResponseRecorder) string {
 }
 
 // ---------------------------------------------------------------------------
-// 1. HTTP Basic Auth Middleware (format validation)
+// Fake OIDC provider helpers (for Bearer / Entra ID tests)
+// ---------------------------------------------------------------------------
+
+// testOIDCProvider bundles an httptest.Server that serves OIDC discovery and
+// JWKS endpoints, along with the RSA key pair used to sign test tokens.
+type testOIDCProvider struct {
+	Server *httptest.Server
+	Key    *rsa.PrivateKey
+}
+
+const testAudience = "api://test-client"
+const testScope = "access_as_user"
+
+// newTestOIDCProvider starts a fake OIDC provider serving discovery and JWKS.
+func newTestOIDCProvider(t *testing.T) *testOIDCProvider {
+	t.Helper()
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate RSA key: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	srv := httptest.NewServer(mux)
+
+	// JWKS endpoint
+	n := base64.RawURLEncoding.EncodeToString(key.N.Bytes())
+	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(key.E)).Bytes())
+	jwksJSON := fmt.Sprintf(`{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":"%s","e":"%s"}]}`, n, e)
+
+	mux.HandleFunc("/jwks", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, jwksJSON)
+	})
+
+	// OIDC discovery endpoint
+	discoveryJSON := fmt.Sprintf(`{
+		"issuer": %q,
+		"authorization_endpoint": %q,
+		"token_endpoint": %q,
+		"jwks_uri": %q,
+		"response_types_supported": ["code"],
+		"subject_types_supported": ["public"],
+		"id_token_signing_alg_values_supported": ["RS256"]
+	}`, srv.URL, srv.URL+"/authorize", srv.URL+"/token", srv.URL+"/jwks")
+
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, discoveryJSON)
+	})
+
+	return &testOIDCProvider{
+		Server: srv,
+		Key:    key,
+	}
+}
+
+// signTestToken signs a JWT with the given RSA key, setting the kid header.
+func signTestToken(t *testing.T, key *rsa.PrivateKey, claims jwt.MapClaims) string {
+	t.Helper()
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = "test-key"
+	signed, err := token.SignedString(key)
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+	return signed
+}
+
+// newTestValidator creates a *auth.Validator backed by the given testOIDCProvider.
+func newTestValidator(t *testing.T, tp *testOIDCProvider) *auth.Validator {
+	t.Helper()
+	ctx := context.Background()
+	v, err := auth.NewValidatorForIssuer(ctx, tp.Server.URL, testAudience, testScope)
+	if err != nil {
+		t.Fatalf("failed to create test validator: %v", err)
+	}
+	return v
+}
+
+// validTokenClaims returns a jwt.MapClaims map for a valid token matching
+// the test OIDC provider's issuer URL.
+func validTokenClaims(issuerURL string) jwt.MapClaims {
+	return jwt.MapClaims{
+		"aud":                testAudience,
+		"iss":                issuerURL,
+		"scp":                testScope,
+		"oid":                "user-object-id-123",
+		"preferred_username": "alice@example.com",
+		"name":               "Alice Smith",
+		"exp":                time.Now().Add(time.Hour).Unix(),
+		"iat":                time.Now().Unix(),
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 1. HTTP Basic Auth Middleware (format validation) — disabled mode (v == nil)
 // ---------------------------------------------------------------------------
 
 func TestBasicAuth_ValidCredentials(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", "key-abc123"))
@@ -110,8 +214,9 @@ func TestBasicAuth_ValidCredentials(t *testing.T) {
 }
 
 func TestBasicAuth_MissingAuthorizationHeader(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// No Authorization header set
@@ -134,8 +239,9 @@ func TestBasicAuth_MissingAuthorizationHeader(t *testing.T) {
 }
 
 func TestBasicAuth_EmptyPassword(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", ""))
@@ -158,8 +264,9 @@ func TestBasicAuth_EmptyPassword(t *testing.T) {
 }
 
 func TestBasicAuth_WrongUsername(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("admin", "key-abc123"))
@@ -182,8 +289,9 @@ func TestBasicAuth_WrongUsername(t *testing.T) {
 }
 
 func TestBasicAuth_MalformedAuthorizationHeader(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	tests := []struct {
 		name  string
@@ -212,14 +320,14 @@ func TestBasicAuth_MalformedAuthorizationHeader(t *testing.T) {
 }
 
 func TestBasicAuth_NonBasicScheme(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	schemes := []struct {
 		name  string
 		value string
 	}{
-		{"Bearer token", "Bearer some-jwt-token"},
 		{"Digest auth", "Digest username=\"api\""},
 		{"Token scheme", "Token key-abc123"},
 	}
@@ -245,12 +353,13 @@ func TestBasicAuth_NonBasicScheme(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Configurable Auth Mode
+// 2. Configurable Auth Mode — disabled mode (v == nil)
 // ---------------------------------------------------------------------------
 
 func TestAuthMode_AcceptAny_NoAuthHeader(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("accept_any", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// No Authorization header
@@ -272,8 +381,9 @@ func TestAuthMode_AcceptAny_NoAuthHeader(t *testing.T) {
 }
 
 func TestAuthMode_AcceptAny_InvalidAuthHeader(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("accept_any", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "totally-bogus-value")
@@ -289,8 +399,9 @@ func TestAuthMode_AcceptAny_InvalidAuthHeader(t *testing.T) {
 }
 
 func TestAuthMode_AcceptAny_ValidAuthHeader(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("accept_any", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", "key-abc123"))
@@ -306,9 +417,10 @@ func TestAuthMode_AcceptAny_ValidAuthHeader(t *testing.T) {
 }
 
 func TestAuthMode_Single_CorrectKey(t *testing.T) {
+	db := setupTestDB(t)
 	masterKey := "key-master-secret-12345"
 	cfg := newMockConfig("single", masterKey)
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", masterKey))
@@ -330,9 +442,10 @@ func TestAuthMode_Single_CorrectKey(t *testing.T) {
 }
 
 func TestAuthMode_Single_WrongKey(t *testing.T) {
+	db := setupTestDB(t)
 	masterKey := "key-master-secret-12345"
 	cfg := newMockConfig("single", masterKey)
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", "key-wrong-key-99999"))
@@ -355,9 +468,10 @@ func TestAuthMode_Single_WrongKey(t *testing.T) {
 }
 
 func TestAuthMode_Single_MissingAuth(t *testing.T) {
+	db := setupTestDB(t)
 	masterKey := "key-master-secret-12345"
 	cfg := newMockConfig("single", masterKey)
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// No Authorization header
@@ -380,11 +494,12 @@ func TestAuthMode_Single_MissingAuth(t *testing.T) {
 }
 
 func TestAuthMode_Single_EmptySigningKey(t *testing.T) {
+	db := setupTestDB(t)
 	// Edge case: single mode but the signing key itself is empty in config.
 	// Any non-empty password should fail since it won't match the empty signing key,
 	// and empty passwords should also fail since Basic Auth requires a non-empty key.
 	cfg := newMockConfig("single", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", "some-key"))
@@ -400,8 +515,9 @@ func TestAuthMode_Single_EmptySigningKey(t *testing.T) {
 }
 
 func TestAuthMode_Full_ValidBasicAuth(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", "key-anything-goes"))
@@ -417,8 +533,9 @@ func TestAuthMode_Full_ValidBasicAuth(t *testing.T) {
 }
 
 func TestAuthMode_Full_MissingAuth(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -433,8 +550,9 @@ func TestAuthMode_Full_MissingAuth(t *testing.T) {
 }
 
 func TestAuthMode_Full_WrongUsername(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("notapi", "key-abc"))
@@ -450,8 +568,9 @@ func TestAuthMode_Full_WrongUsername(t *testing.T) {
 }
 
 func TestAuthMode_Full_EmptyPassword(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", ""))
@@ -471,8 +590,9 @@ func TestAuthMode_Full_EmptyPassword(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuthMode_DynamicConfigChange(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("accept_any", "key-master")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	t.Run("initially passes without auth in accept_any mode", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -793,8 +913,9 @@ func TestDomainFromContext_EmptyWhenNotSet(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestBasicAuth_ErrorResponseIsJSON(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// No auth header — should trigger 401
@@ -832,8 +953,9 @@ func TestRequireDomain_ErrorResponseIsJSON(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestBasicAuth_WorksWithDifferentHTTPMethods(t *testing.T) {
+	db := setupTestDB(t)
 	cfg := newMockConfig("full", "")
-	handler := middleware.BasicAuth(cfg)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	methods := []string{
 		http.MethodGet,
@@ -868,7 +990,7 @@ func TestBasicAuth_WorksWithDifferentHTTPMethods(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Managed Keys auth mode
+// Managed Keys auth mode — disabled mode (v == nil)
 // ---------------------------------------------------------------------------
 
 func TestBasicAuth_ManagedKeys_Valid(t *testing.T) {
@@ -880,7 +1002,7 @@ func TestBasicAuth_ManagedKeys_Valid(t *testing.T) {
 		t.Fatalf("failed to create managed API key: %v", err)
 	}
 
-	handler := middleware.BasicAuth(cfg, db)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", "mock_testkey123"))
@@ -910,7 +1032,7 @@ func TestBasicAuth_ManagedKeys_Invalid(t *testing.T) {
 		t.Fatalf("failed to create managed API key: %v", err)
 	}
 
-	handler := middleware.BasicAuth(cfg, db)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", "wrong-key"))
@@ -937,7 +1059,7 @@ func TestBasicAuth_ManagedKeys_EmptyTable(t *testing.T) {
 	cfg := newMockConfig("managed_keys", "")
 
 	// Do NOT insert any managed API keys.
-	handler := middleware.BasicAuth(cfg, db)(dummyHandler)
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", basicAuthHeader("api", "some-key"))
@@ -957,4 +1079,287 @@ func TestBasicAuth_ManagedKeys_EmptyTable(t *testing.T) {
 			t.Errorf("expected message %q, got %q", "Forbidden", msg)
 		}
 	})
+}
+
+// ===========================================================================
+// APIAuth — Bearer arm tests (Entra ID JWT validation)
+// ===========================================================================
+
+// TestAPIAuth_Bearer_ValidToken verifies that a valid JWT presented via
+// Bearer auth passes through when a validator is configured.
+func TestAPIAuth_Bearer_ValidToken(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+
+	db := setupTestDB(t)
+	cfg := newMockConfig("full", "")
+	v := newTestValidator(t, tp)
+
+	handler := middleware.APIAuth(cfg, db, v)(dummyHandler)
+
+	raw := signTestToken(t, tp.Key, validTokenClaims(tp.Server.URL))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", rec.Code)
+	}
+	if rec.Body.String() != "ok" {
+		t.Errorf("expected body %q, got %q", "ok", rec.Body.String())
+	}
+}
+
+// TestAPIAuth_Bearer_InvalidToken_NoFallthrough verifies that an invalid JWT
+// via Bearer returns 401 and does NOT fall through to Basic auth.
+func TestAPIAuth_Bearer_InvalidToken_NoFallthrough(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+
+	db := setupTestDB(t)
+	cfg := newMockConfig("accept_any", "") // accept_any would pass Basic, proving no fall-through
+	v := newTestValidator(t, tp)
+
+	handler := middleware.APIAuth(cfg, db, v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer invalid-jwt-token")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401 for invalid Bearer token (no fall-through), got %d", rec.Code)
+	}
+}
+
+// TestAPIAuth_Bearer_DisabledValidator_401 verifies that when a Bearer token
+// is presented but the validator is nil (Entra ID disabled), the middleware
+// returns 401 with a Basic challenge.
+func TestAPIAuth_Bearer_DisabledValidator_401(t *testing.T) {
+	db := setupTestDB(t)
+	cfg := newMockConfig("full", "")
+
+	handler := middleware.APIAuth(cfg, db, nil)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer some-jwt-token")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401 for Bearer with nil validator, got %d", rec.Code)
+	}
+
+	// Should tell the client to use Basic auth instead.
+	wwwAuth := rec.Header().Get("WWW-Authenticate")
+	expected := `Basic realm="mailgun-mock-api"`
+	if wwwAuth != expected {
+		t.Errorf("expected WWW-Authenticate %q, got %q", expected, wwwAuth)
+	}
+}
+
+// ===========================================================================
+// APIAuth — Entra-mode Basic arm tests (v != nil, no Bearer)
+// ===========================================================================
+
+// TestAPIAuth_EntraBasic_ValidManagedKey verifies that when the validator is
+// present (Entra mode) and a request uses Basic auth with a valid managed key,
+// the request passes through.
+func TestAPIAuth_EntraBasic_ValidManagedKey(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+
+	db := setupTestDB(t)
+	cfg := newMockConfig("full", "")
+	v := newTestValidator(t, tp)
+
+	// Insert a managed API key.
+	key := apikey.ManagedAPIKey{Name: "entra-key", KeyValue: "mock_entrakey123", Prefix: "mock_entrak"}
+	if err := db.Create(&key).Error; err != nil {
+		t.Fatalf("failed to create managed API key: %v", err)
+	}
+
+	handler := middleware.APIAuth(cfg, db, v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", basicAuthHeader("api", "mock_entrakey123"))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200 for valid managed key in Entra mode, got %d", rec.Code)
+	}
+	if rec.Body.String() != "ok" {
+		t.Errorf("expected body %q, got %q", "ok", rec.Body.String())
+	}
+}
+
+// TestAPIAuth_EntraBasic_InvalidKey_401 verifies that when the validator is
+// present (Entra mode) and a request uses Basic auth with an unknown key,
+// the request is rejected with 401.
+func TestAPIAuth_EntraBasic_InvalidKey_401(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+
+	db := setupTestDB(t)
+	cfg := newMockConfig("full", "")
+	v := newTestValidator(t, tp)
+
+	// Insert a managed API key (the request will use a different one).
+	key := apikey.ManagedAPIKey{Name: "entra-key", KeyValue: "mock_entrakey123", Prefix: "mock_entrak"}
+	if err := db.Create(&key).Error; err != nil {
+		t.Fatalf("failed to create managed API key: %v", err)
+	}
+
+	handler := middleware.APIAuth(cfg, db, v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", basicAuthHeader("api", "unknown-key-value"))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401 for unknown key in Entra mode, got %d", rec.Code)
+	}
+}
+
+// TestAPIAuth_EntraBasic_IgnoresMockConfigFullMode is a regression test for
+// the anti-footgun behavior: even when MockConfig says "full" (accept any
+// well-formed Basic auth), Entra mode MUST reject keys not found in
+// managed_api_keys. This prevents accidentally accepting arbitrary keys when
+// Entra ID auth is enabled.
+func TestAPIAuth_EntraBasic_IgnoresMockConfigFullMode(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+
+	db := setupTestDB(t)
+	// "full" mode normally accepts any well-formed Basic auth.
+	cfg := newMockConfig("full", "")
+	v := newTestValidator(t, tp)
+
+	// Do NOT insert any managed keys — the table is empty.
+	handler := middleware.APIAuth(cfg, db, v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", basicAuthHeader("api", "any-random-key"))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401 in Entra mode even with full auth_mode, got %d", rec.Code)
+	}
+}
+
+// ===========================================================================
+// APIAuth — WWW-Authenticate challenge header tests
+// ===========================================================================
+
+// TestAPIAuth_Bearer_Invalid_SetsBearerChallenge verifies that when a Bearer
+// token fails validation, the 401 response includes the correct
+// WWW-Authenticate: Bearer challenge header.
+func TestAPIAuth_Bearer_Invalid_SetsBearerChallenge(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+
+	db := setupTestDB(t)
+	cfg := newMockConfig("full", "")
+	v := newTestValidator(t, tp)
+
+	handler := middleware.APIAuth(cfg, db, v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer invalid-jwt-token")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", rec.Code)
+	}
+
+	wwwAuth := rec.Header().Get("WWW-Authenticate")
+	expected := `Bearer realm="mailgun-mock-api"`
+	if wwwAuth != expected {
+		t.Errorf("expected WWW-Authenticate %q, got %q", expected, wwwAuth)
+	}
+}
+
+// TestAPIAuth_Basic_Invalid_SetsBasicChallenge verifies that when Basic auth
+// fails (in either Entra or disabled mode), the 401 response includes the
+// correct WWW-Authenticate: Basic challenge header.
+func TestAPIAuth_Basic_Invalid_SetsBasicChallenge(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+	defer tp.Server.Close()
+
+	db := setupTestDB(t)
+	cfg := newMockConfig("full", "")
+	v := newTestValidator(t, tp)
+
+	// Entra mode, no managed keys — Basic auth with any key should fail.
+	handler := middleware.APIAuth(cfg, db, v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", basicAuthHeader("api", "unknown-key"))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", rec.Code)
+	}
+
+	wwwAuth := rec.Header().Get("WWW-Authenticate")
+	expected := `Basic realm="mailgun-mock-api"`
+	if wwwAuth != expected {
+		t.Errorf("expected WWW-Authenticate %q, got %q", expected, wwwAuth)
+	}
+}
+
+// ===========================================================================
+// APIAuth — Provider unavailable (503)
+// ===========================================================================
+
+// TestAPIAuth_Bearer_ProviderUnavailable_503 verifies that when the JWKS
+// endpoint is unreachable (provider down), the middleware returns 503 with
+// the appropriate WWW-Authenticate header indicating temporary unavailability.
+func TestAPIAuth_Bearer_ProviderUnavailable_503(t *testing.T) {
+	tp := newTestOIDCProvider(t)
+
+	db := setupTestDB(t)
+	cfg := newMockConfig("full", "")
+
+	// Create the validator while the provider is still running.
+	v := newTestValidator(t, tp)
+
+	// Sign a token that would be valid if the provider were reachable.
+	raw := signTestToken(t, tp.Key, validTokenClaims(tp.Server.URL))
+
+	// Stop the OIDC provider so JWKS fetch fails during verification.
+	tp.Server.Close()
+
+	handler := middleware.APIAuth(cfg, db, v)(dummyHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected status 503 for unavailable provider, got %d", rec.Code)
+	}
+
+	wwwAuth := rec.Header().Get("WWW-Authenticate")
+	expected := `Bearer error="temporarily_unavailable"`
+	if wwwAuth != expected {
+		t.Errorf("expected WWW-Authenticate %q, got %q", expected, wwwAuth)
+	}
 }

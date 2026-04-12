@@ -759,17 +759,17 @@ Ordered, discrete tasks. Each task ends with a verification step. Backend tasks 
   - Use the `newValidatorForIssuer` helper from Task 2 + a fake JWKS httptest server.
 
 **Checklist:**
-- [ ] Rename `BasicAuth` → `APIAuth` with new signature
-- [ ] Implement Bearer arm with fail-fast on invalid token
-- [ ] Implement entra-mode Basic arm (managed-keys lookup, bypassing mock config)
-- [ ] Preserve disabled-mode Basic arm behavior unchanged
-- [ ] Add `extractBearer`, `unauthorized`, `providerUnavailable` helpers
-- [ ] All 401s set `WWW-Authenticate` with the correct scheme (H4)
-- [ ] `ErrProviderUnavailable` maps to 503 + `Bearer error="temporarily_unavailable"` (H6)
-- [ ] Update all call sites in `server.go`
-- [ ] Add 9 new tests (6 original + 3 for H4/H6)
-- [ ] `go test ./internal/middleware/...` passes
-- [ ] `go build ./...` passes
+- [x] Rename `BasicAuth` → `APIAuth` with new signature
+- [x] Implement Bearer arm with fail-fast on invalid token
+- [x] Implement entra-mode Basic arm (managed-keys lookup, bypassing mock config)
+- [x] Preserve disabled-mode Basic arm behavior unchanged
+- [x] Add `extractBearer`, `unauthorized`, `providerUnavailable` helpers
+- [x] All 401s set `WWW-Authenticate` with the correct scheme (H4)
+- [x] `ErrProviderUnavailable` maps to 503 + `Bearer error="temporarily_unavailable"` (H6)
+- [x] Update all call sites in `server.go`
+- [x] Add 9 new tests (6 original + 3 for H4/H6)
+- [x] `go test ./internal/middleware/...` passes
+- [x] `go build ./...` passes
 
 ---
 
