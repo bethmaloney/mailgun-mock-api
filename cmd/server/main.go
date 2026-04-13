@@ -33,7 +33,7 @@ func main() {
 	var validator *auth.Validator
 	if cfg.AuthMode == "entra" {
 		var err error
-		validator, err = auth.NewValidator(ctx, cfg.EntraTenantID, "api://"+cfg.EntraClientID, cfg.EntraAPIScope)
+		validator, err = auth.NewValidator(ctx, cfg.EntraTenantID, cfg.EntraClientID, cfg.EntraAPIScope)
 		if err != nil {
 			log.Fatalf("Failed to initialize auth validator: %v", err)
 		}

@@ -83,7 +83,7 @@ func signToken(t *testing.T, key *rsa.PrivateKey, claims jwt.MapClaims) string {
 	return signed
 }
 
-const testAudience = "api://test-client"
+const testAudience = "test-client-id"
 const testScope = "access_as_user"
 
 func TestValidate(t *testing.T) {
