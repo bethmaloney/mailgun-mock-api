@@ -44,6 +44,7 @@ func setupAttachmentTestDB(t *testing.T) *gorm.DB {
 // setupAttachmentRouter creates a chi router with domain, message, and
 // attachment routes registered.
 func setupAttachmentRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	mh := message.NewHandlers(db, cfg)
 	r := chi.NewRouter()

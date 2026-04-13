@@ -104,11 +104,15 @@ func (h *Handlers) SetHub(hub *ws.Hub) {
 	h.hub = hub
 }
 
-// NewHandlers creates a new Handlers instance. It resets event data in the
-// database to ensure a clean state for the mock server.
+// NewHandlers creates a new Handlers instance.
 func NewHandlers(db *gorm.DB, config *mock.MockConfig) *Handlers {
-	db.Unscoped().Where("1 = 1").Delete(&Event{})
 	return &Handlers{db: db, config: config}
+}
+
+// ResetForTests deletes all event data. Call this in tests that need a clean
+// database state (e.g. when using a shared in-memory SQLite DB).
+func ResetForTests(db *gorm.DB) {
+	db.Unscoped().Where("1 = 1").Delete(&Event{})
 }
 
 // broadcastEventNew sends an event.new WebSocket message if a hub is configured.

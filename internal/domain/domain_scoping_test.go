@@ -53,6 +53,7 @@ func scopingConfig() *mock.MockConfig {
 // and domain routes. This mirrors how the production server wires things up
 // but includes the SubaccountScoping middleware before domain handlers.
 func setupScopingRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
 	h := domain.NewHandlers(db, cfg)
 	r := chi.NewRouter()
 	r.Route("/v4/domains", func(r chi.Router) {

@@ -17,11 +17,14 @@ type ManagedHandlers struct {
 }
 
 // NewManagedHandlers creates a new ManagedHandlers instance.
-// It cleans up any existing ManagedAPIKey data to ensure test isolation
-// when using a shared in-memory database.
 func NewManagedHandlers(db *gorm.DB) *ManagedHandlers {
-	db.Unscoped().Where("1 = 1").Delete(&ManagedAPIKey{})
 	return &ManagedHandlers{db: db}
+}
+
+// ResetManagedForTests deletes all managed API key data. Call this in tests
+// that need a clean database state (e.g. when using a shared in-memory SQLite DB).
+func ResetManagedForTests(db *gorm.DB) {
+	db.Unscoped().Where("1 = 1").Delete(&ManagedAPIKey{})
 }
 
 // List handles GET requests and returns all managed API keys.

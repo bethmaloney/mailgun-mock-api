@@ -38,6 +38,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 
 // setupRouter creates a chi router with all domain routes registered.
 func setupRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
 	h := domain.NewHandlers(db, cfg)
 	r := chi.NewRouter()
 	r.Route("/v4/domains", func(r chi.Router) {

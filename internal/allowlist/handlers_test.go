@@ -35,6 +35,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 
 // setupRouter creates a chi router with IP allowlist routes registered.
 func setupRouter(db *gorm.DB) http.Handler {
+	allowlist.ResetForTests(db)
 	h := allowlist.NewHandlers(db)
 	r := chi.NewRouter()
 	r.Route("/v2/ip_whitelist", func(r chi.Router) {

@@ -55,11 +55,14 @@ type Handlers struct {
 }
 
 // NewHandlers creates a new Handlers instance.
-// It cleans up any existing IPAllowlistEntry data to ensure test isolation
-// when using a shared in-memory database.
 func NewHandlers(db *gorm.DB) *Handlers {
-	db.Unscoped().Where("1 = 1").Delete(&IPAllowlistEntry{})
 	return &Handlers{db: db}
+}
+
+// ResetForTests deletes all IP allowlist data. Call this in tests that need a
+// clean database state (e.g. when using a shared in-memory SQLite DB).
+func ResetForTests(db *gorm.DB) {
+	db.Unscoped().Where("1 = 1").Delete(&IPAllowlistEntry{})
 }
 
 // isValidIPOrCIDR checks whether the given address is a valid IP or CIDR notation.

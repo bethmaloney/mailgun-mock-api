@@ -65,14 +65,19 @@ type Handlers struct {
 	db *gorm.DB
 }
 
-// NewHandlers creates a new Handlers instance. It resets suppression-related
-// data in the database to ensure a clean state for the mock server.
+// NewHandlers creates a new Handlers instance.
 func NewHandlers(db *gorm.DB) *Handlers {
+	return &Handlers{db: db}
+}
+
+// ResetForTests deletes all suppression data (bounces, complaints,
+// unsubscribes, allowlist entries). Call this in tests that need a clean
+// database state (e.g. when using a shared in-memory SQLite DB).
+func ResetForTests(db *gorm.DB) {
 	db.Unscoped().Where("1 = 1").Delete(&Bounce{})
 	db.Unscoped().Where("1 = 1").Delete(&Complaint{})
 	db.Unscoped().Where("1 = 1").Delete(&Unsubscribe{})
 	db.Unscoped().Where("1 = 1").Delete(&AllowlistEntry{})
-	return &Handlers{db: db}
 }
 
 // ---------------------------------------------------------------------------

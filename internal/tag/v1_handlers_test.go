@@ -25,6 +25,8 @@ import (
 // setupV1Router creates a router with existing v3 routes, the new singular
 // /v3/{domain_name}/tag routes, and the v1 analytics endpoints registered.
 func setupV1Router(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
+	event.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	tgh := tag.NewHandlers(db)
 	eh := event.NewHandlers(db, cfg)

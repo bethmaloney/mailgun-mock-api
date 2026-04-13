@@ -66,6 +66,7 @@ func defaultConfig() *mock.MockConfig {
 }
 
 func setupRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	wh := webhook.NewHandlers(db, cfg)
 	r := chi.NewRouter()

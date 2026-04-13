@@ -26,6 +26,7 @@ func setupManagedTestDB(t *testing.T) *gorm.DB {
 	if err := db.AutoMigrate(&ManagedAPIKey{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
+	ResetManagedForTests(db)
 	return db
 }
 

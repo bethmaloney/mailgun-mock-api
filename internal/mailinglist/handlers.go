@@ -51,12 +51,16 @@ type Handlers struct {
 	db *gorm.DB
 }
 
-// NewHandlers creates a new Handlers instance. It resets mailing-list-related
-// data in the database to ensure a clean state for the mock server.
+// NewHandlers creates a new Handlers instance.
 func NewHandlers(db *gorm.DB) *Handlers {
+	return &Handlers{db: db}
+}
+
+// ResetForTests deletes all mailing list and member data. Call this in tests
+// that need a clean database state (e.g. when using a shared in-memory SQLite DB).
+func ResetForTests(db *gorm.DB) {
 	db.Unscoped().Where("1 = 1").Delete(&MailingList{})
 	db.Unscoped().Where("1 = 1").Delete(&MailingListMember{})
-	return &Handlers{db: db}
 }
 
 // ---------------------------------------------------------------------------

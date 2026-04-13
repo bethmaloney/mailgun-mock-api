@@ -32,6 +32,7 @@ func setupTrackingTestDB(t *testing.T) *gorm.DB {
 
 // setupTrackingRouter creates a chi router with domain CRUD and tracking routes.
 func setupTrackingRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
 	h := domain.NewHandlers(db, cfg)
 	r := chi.NewRouter()
 	// Domain CRUD routes needed to create test domains.

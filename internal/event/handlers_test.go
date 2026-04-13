@@ -65,6 +65,8 @@ func noAutoDeliverConfig() *mock.MockConfig {
 
 // setupRouter creates a chi router with domain, message, and event routes registered.
 func setupRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
+	event.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	mh := message.NewHandlers(db, cfg)
 	eh := event.NewHandlers(db, cfg)

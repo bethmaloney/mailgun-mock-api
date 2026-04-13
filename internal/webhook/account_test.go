@@ -69,6 +69,8 @@ func accountDefaultConfig() *mock.MockConfig {
 // mock webhook inspection routes, domain routes, v3 domain webhook routes,
 // and message sending routes.
 func setupAccountRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
+	event.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	wh := webhook.NewHandlers(db, cfg)
 	eh := event.NewHandlers(db, cfg)

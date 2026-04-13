@@ -68,6 +68,9 @@ func listTestConfig() *mock.MockConfig {
 // routes registered. This allows testing the full integration path: create a
 // domain, create a mailing list, add members, and send a message to the list.
 func setupListRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
+	event.ResetForTests(db)
+	mailinglist.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	mh := message.NewHandlers(db, cfg)
 	mlh := mailinglist.NewHandlers(db)
