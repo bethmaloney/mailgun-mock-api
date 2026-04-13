@@ -38,6 +38,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 // setupRouter creates a chi router with API key routes registered.
 // API keys are account-level (not domain-scoped), registered under /v1/keys.
 func setupRouter(db *gorm.DB) http.Handler {
+	apikey.ResetForTests(db)
 	kh := apikey.NewHandlers(db)
 	r := chi.NewRouter()
 	r.Route("/v1/keys", func(r chi.Router) {

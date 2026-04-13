@@ -121,14 +121,17 @@ type Handlers struct {
 }
 
 // NewHandlers creates a new Handlers instance.
-// It cleans up any existing APIKey data to ensure test isolation
-// when using a shared in-memory database.
 func NewHandlers(db *gorm.DB) *Handlers {
-	db.Unscoped().Where("1 = 1").Delete(&APIKey{})
 	return &Handlers{
 		db:        db,
 		publicKey: generateSecret("pubkey-"),
 	}
+}
+
+// ResetForTests deletes all API key data. Call this in tests that need a clean
+// database state (e.g. when using a shared in-memory SQLite DB).
+func ResetForTests(db *gorm.DB) {
+	db.Unscoped().Where("1 = 1").Delete(&APIKey{})
 }
 
 // validRoles is the set of allowed role values.

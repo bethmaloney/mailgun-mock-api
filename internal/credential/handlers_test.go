@@ -48,6 +48,8 @@ func defaultConfig() *mock.MockConfig {
 
 // setupRouter creates a chi router with domain and credential routes registered.
 func setupRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
+	credential.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	ch := credential.NewHandlers(db)
 	r := chi.NewRouter()

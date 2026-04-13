@@ -113,6 +113,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 }
 
 func setupRouter(db *gorm.DB) http.Handler {
+	mailinglist.ResetForTests(db)
 	h := mailinglist.NewHandlers(db)
 	r := chi.NewRouter()
 

@@ -24,6 +24,8 @@ import (
 // setupStatsRouter creates a router with all tag CRUD routes, tag stats routes,
 // and domain stats routes registered.
 func setupStatsRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
+	event.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	tgh := tag.NewHandlers(db)
 	eh := event.NewHandlers(db, cfg)

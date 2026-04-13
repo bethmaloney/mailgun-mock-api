@@ -46,6 +46,9 @@ func setupTestDBWithSuppressions(t *testing.T) *gorm.DB {
 // suppression, and mock trigger routes registered. This is the full router
 // needed for suppression integration testing.
 func setupSuppressionRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
+	event.ResetForTests(db)
+	suppression.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	mh := message.NewHandlers(db, cfg)
 	eh := event.NewHandlers(db, cfg)

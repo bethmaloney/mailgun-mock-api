@@ -149,12 +149,16 @@ type Handlers struct {
 	config *mock.MockConfig
 }
 
-// NewHandlers creates a new Handlers instance. It resets domain-related data
-// in the database to ensure a clean state for the mock server.
+// NewHandlers creates a new Handlers instance.
 func NewHandlers(db *gorm.DB, config *mock.MockConfig) *Handlers {
+	return &Handlers{db: db, config: config}
+}
+
+// ResetForTests deletes all domain and DNS record data. Call this in tests
+// that need a clean database state (e.g. when using a shared in-memory SQLite DB).
+func ResetForTests(db *gorm.DB) {
 	db.Unscoped().Where("1 = 1").Delete(&DNSRecord{})
 	db.Unscoped().Where("1 = 1").Delete(&Domain{})
-	return &Handlers{db: db, config: config}
 }
 
 // validSpamActions is the set of allowed spam_action values.

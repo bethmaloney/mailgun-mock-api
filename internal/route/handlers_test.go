@@ -64,6 +64,7 @@ func defaultConfig() *mock.MockConfig {
 // setupRouter creates a chi router with all route endpoints and domain
 // creation endpoint registered.
 func setupRouter(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	rh := route.NewHandlers(db)
 	r := chi.NewRouter()

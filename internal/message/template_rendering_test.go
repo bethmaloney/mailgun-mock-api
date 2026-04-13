@@ -51,6 +51,7 @@ func setupTestDBWithTemplates(t *testing.T) *gorm.DB {
 // setupRouterWithTemplates creates a chi router with domain, message, and
 // template routes registered — everything needed for template rendering tests.
 func setupRouterWithTemplates(db *gorm.DB, cfg *mock.MockConfig) http.Handler {
+	domain.ResetForTests(db)
 	dh := domain.NewHandlers(db, cfg)
 	mh := message.NewHandlers(db, cfg)
 	th := template.NewHandlers(db)

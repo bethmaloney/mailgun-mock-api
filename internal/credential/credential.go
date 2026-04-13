@@ -57,11 +57,14 @@ type Handlers struct {
 }
 
 // NewHandlers creates a new Handlers instance.
-// It cleans up any existing SMTP credential data to ensure test isolation
-// when using a shared in-memory database.
 func NewHandlers(db *gorm.DB) *Handlers {
-	db.Unscoped().Where("1 = 1").Delete(&SMTPCredential{})
 	return &Handlers{db: db}
+}
+
+// ResetForTests deletes all SMTP credential data. Call this in tests that need
+// a clean database state (e.g. when using a shared in-memory SQLite DB).
+func ResetForTests(db *gorm.DB) {
+	db.Unscoped().Where("1 = 1").Delete(&SMTPCredential{})
 }
 
 // getDomainName extracts the domain name from the URL, checking both
